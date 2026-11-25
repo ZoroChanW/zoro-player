@@ -28,6 +28,10 @@ use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder, Windo
 use tauri_plugin_dialog::DialogExt;
 
 /// When true, closing the main window hides it to the tray instead of quitting.
+/// Must match "additionalBrowserArgs" of the main window in tauri.conf.json.
+#[cfg(windows)]
+const BROWSER_ARGS: &str = "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection,HardwareMediaKeyHandling,MediaSessionService";
+
 static CLOSE_TO_TRAY: AtomicBool = AtomicBool::new(true);
 
 const WIDGET_W: f64 = 390.0;
@@ -277,7 +281,7 @@ async fn toggle_widget(
         }
     };
 
-    let win = WebviewWindowBuilder::new(&app, "widget", WebviewUrl::App("widget.html".into()))
+    let mut wb = WebviewWindowBuilder::new(&app, "widget", WebviewUrl::App("widget.html".into()))
         .title("Zoro Widget")
         .inner_size(WIDGET_W, WIDGET_H)
         .position(px, py)
@@ -287,9 +291,14 @@ async fn toggle_widget(
         .resizable(false)
         .skip_taskbar(true)
         .always_on_top(on_top)
-        .always_on_bottom(!on_top)
-        .build()
-        .map_err(|e| e.to_string())?;
+        .always_on_bottom(!on_top);
+    // WebView2 windows sharing one user-data folder MUST use identical browser
+    // args, otherwise creation fails with HRESULT 0x8007139F.
+    #[cfg(windows)]
+    {
+        wb = wb.additional_browser_args(BROWSER_ARGS);
+    }
+    let win = wb.build().map_err(|e| e.to_string())?;
 
     let handle = app.clone();
     win.on_window_event(move |ev| {

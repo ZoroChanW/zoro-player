@@ -3,7 +3,7 @@
 // WebView's generic "Unknown app" / "Playing from Edge".
 // On other platforms this is a harmless no-op.
 
-pub const AUMID: &str = "com.zoro.player";
+pub const AUMID: &str = "ZoroPlayer";
 
 #[cfg_attr(not(windows), allow(dead_code))]
 #[derive(Debug)]
@@ -82,13 +82,12 @@ mod imp {
             while let Ok(m) = rx.recv() {
                 match m {
                     Msg::Meta { title, artist, album, cover, duration_ms } => {
-                        let _ = mc.set_metadata(MediaMetadata {
-                            title: Some(&title),
-                            artist: Some(&artist),
-                            album: Some(&album),
-                            cover_url: cover.as_deref(),
-                            duration: if duration_ms > 0 { Some(Duration::from_millis(duration_ms)) } else { None },
-                        });
+                        let dur = if duration_ms > 0 { Some(Duration::from_millis(duration_ms)) } else { None };
+                        let mk = |c: Option<&str>| MediaMetadata { title: Some(&title), artist: Some(&artist), album: Some(&album), cover_url: c, duration: dur };
+                        // a bad cover must not drop title / duration
+                        if mc.set_metadata(mk(cover.as_deref())).is_err() {
+                            let _ = mc.set_metadata(mk(None));
+                        }
                     }
                     Msg::State { playing, pos_ms } => {
                         let p = Some(MediaPosition(Duration::from_millis(pos_ms)));
@@ -117,15 +116,8 @@ mod imp {
 
 pub use imp::{set_app_id, start};
 
-/// file:// URL for a local path, percent-encoding everything unusual.
+/// souvlaki (Windows) strips a leading "file://" and opens the rest as a plain
+/// path, so no percent-encoding and no third slash here.
 pub fn file_url(p: &std::path::Path) -> String {
-    let s = p.to_string_lossy().replace('\\', "/");
-    let mut out = String::from("file:///");
-    for b in s.bytes() {
-        match b {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' | b'/' | b':' => out.push(b as char),
-            _ => out.push_str(&format!("%{:02X}", b)),
-        }
-    }
-    out
+    format!("file://{}", p.display())
 }
