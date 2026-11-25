@@ -736,7 +736,17 @@ async function loadCover(t, token) {
   updateMediaSession(t);
   queueWidgetPush();
 }
+const NATIVE_SMTC = !!(window.__TAURI__ && window.__TAURI__.core);
+function smtcState() {
+  if (!NATIVE_SMTC) return;
+  invoke('smtc_update', { kind: 'state', playing: !audio.paused, position: audio.currentTime || 0 }).catch(() => {});
+}
 function updateMediaSession(t) {
+  if (NATIVE_SMTC) {
+    invoke('smtc_update', { kind: 'meta', path: t.path, title: t.title, artist: t.artist || '', album: t.album || '', duration: curDur() || t.duration || 0 })
+      .then(smtcState).catch(() => {});
+    return;
+  }
   if (!('mediaSession' in navigator)) return;
   try {
     navigator.mediaSession.metadata = new MediaMetadata({
@@ -759,7 +769,8 @@ function updateSeek(force) {
 }
 function setPlaying(p) {
   document.body.classList.toggle('playing', p);
-  if ('mediaSession' in navigator) navigator.mediaSession.playbackState = p ? 'playing' : 'paused';
+  if (NATIVE_SMTC) smtcState();
+  else if ('mediaSession' in navigator) navigator.mediaSession.playbackState = p ? 'playing' : 'paused';
   updateStatus();
   queueWidgetPush();
 }
@@ -1127,6 +1138,7 @@ function bindUI() {
   audio.addEventListener('play', () => { setPlaying(true); kick(); });
   audio.addEventListener('pause', () => { setPlaying(false); updateSeek(true); });
   audio.addEventListener('ended', handleEnded);
+  audio.addEventListener('seeked', smtcState);
   audio.addEventListener('timeupdate', () => {
     if (audio.paused) updateSeek();
     if (st.widgetOpen) emitTo('widget', 'zp-tick', { pos: audio.currentTime, dur: curDur() }).catch(() => {});
@@ -1188,7 +1200,7 @@ function bindUI() {
   listen('zp-widget-pin', e => { S.widgetTop = !!(e.payload && e.payload.onTop); saveSettings(); syncSettingsUI(); });
   listen('zp-cmd', e => {
     const { cmd, value } = e.payload || {};
-    if (cmd === 'toggle') togglePlay(); else if (cmd === 'next') next(); else if (cmd === 'prev') prev(); else if (cmd === 'seek') seekRatio(+value);
+    if (cmd === 'toggle') togglePlay(); else if (cmd === 'play') { if (audio.paused) togglePlay(); } else if (cmd === 'pause') { if (!audio.paused) togglePlay(); } else if (cmd === 'next') next(); else if (cmd === 'prev') prev(); else if (cmd === 'seek') seekRatio(+value);
   });
 
   // remember position

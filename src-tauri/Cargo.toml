@@ -18,6 +18,9 @@ symphonia = { version = "0.5", features = ["all"] }
 rusqlite = { version = "0.32", features = ["bundled"] }
 notify-debouncer-mini = "0.5"
 
+[target.'cfg(windows)'.dependencies]
+souvlaki = "0.9"
+
 [profile.release]
 opt-level = 3
 lto = true

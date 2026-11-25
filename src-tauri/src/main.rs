@@ -7,6 +7,7 @@ mod db;
 mod decode;
 mod library;
 mod oauth;
+mod smtc;
 
 use library::{
     edit_track as lib_edit_track, find_cover, is_audio, is_embed_image,
@@ -18,6 +19,7 @@ use std::path::{Path, PathBuf};
 use tauri::ipc::Response;
 use notify_debouncer_mini::{new_debouncer, notify::RecursiveMode, DebounceEventResult, Debouncer};
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc::Sender;
 use std::sync::Mutex;
 use std::time::Duration;
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
@@ -355,8 +357,67 @@ fn set_tray_tooltip(app: AppHandle, text: String) {
     }
 }
 
+struct SmtcTx(Mutex<Option<Sender<smtc::Msg>>>);
+static COVER_N: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+
+/// Pushes now-playing info to the OS media session. `kind`: "meta" | "state" | "stop".
+#[tauri::command]
+async fn smtc_update(
+    app: AppHandle,
+    state: tauri::State<'_, SmtcTx>,
+    kind: String,
+    path: Option<String>,
+    title: Option<String>,
+    artist: Option<String>,
+    album: Option<String>,
+    duration: Option<f64>,
+    position: Option<f64>,
+    playing: Option<bool>,
+) -> Result<(), String> {
+    let msg = match kind.as_str() {
+        "meta" => {
+            let mut cover = None;
+            if let Some(p) = path {
+                let p2 = PathBuf::from(&p);
+                let dir = app.path().app_cache_dir().ok();
+                cover = tauri::async_runtime::spawn_blocking(move || {
+                    let bytes = find_cover(&p2)?;
+                    let dir = dir?;
+                    std::fs::create_dir_all(&dir).ok()?;
+                    // rotate names so Windows never serves a stale cached image
+                    let n = COVER_N.fetch_add(1, Ordering::Relaxed) % 4;
+                    let f = dir.join(format!("smtc-cover-{}.img", n));
+                    std::fs::write(&f, bytes).ok()?;
+                    Some(smtc::file_url(&f))
+                })
+                .await
+                .ok()
+                .flatten();
+            }
+            smtc::Msg::Meta {
+                title: title.unwrap_or_default(),
+                artist: artist.unwrap_or_default(),
+                album: album.unwrap_or_default(),
+                cover,
+                duration_ms: (duration.unwrap_or(0.0).max(0.0) * 1000.0) as u64,
+            }
+        }
+        "state" => smtc::Msg::State {
+            playing: playing.unwrap_or(false),
+            pos_ms: (position.unwrap_or(0.0).max(0.0) * 1000.0) as u64,
+        },
+        _ => smtc::Msg::Stop,
+    };
+    if let Some(tx) = state.0.lock().map_err(|e| e.to_string())?.as_ref() {
+        let _ = tx.send(msg);
+    }
+    Ok(())
+}
+
 fn main() {
+    smtc::set_app_id();
     tauri::Builder::default()
+        .manage(SmtcTx(Mutex::new(None)))
         .plugin(tauri_plugin_dialog::init())
         .on_window_event(|window, event| {
             if window.label() == "main" {
@@ -409,6 +470,17 @@ fn main() {
                 b = b.icon(icon.clone());
             }
             b.build(app)?;
+            if let Some(w) = app.get_webview_window("main") {
+                #[cfg(windows)]
+                let hwnd = w.hwnd().map(|h| h.0 as isize).unwrap_or(0);
+                #[cfg(not(windows))]
+                let hwnd = {
+                    let _ = &w;
+                    0isize
+                };
+                let tx = smtc::start(app.handle().clone(), hwnd);
+                *app.state::<SmtcTx>().0.lock().unwrap() = Some(tx);
+            }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -433,7 +505,8 @@ fn main() {
             set_widget_pin,
             set_close_to_tray,
             set_tray_labels,
-            set_tray_tooltip
+            set_tray_tooltip,
+            smtc_update
         ])
         .run(tauri::generate_context!())
         .expect("error while running Zoro Player");
