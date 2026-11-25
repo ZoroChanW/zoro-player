@@ -14,6 +14,35 @@ Zoro Player is designed to feel less like a generic music app and more like a ca
 
 The look is not locked to one style. Switch between **Monochrome**, **Mono + Cover**, **Paper**, **Amber**, and **Phosphor**, then fine-tune backgrounds, accent colors, blur, brightness, panel opacity, corner radius, cover presentation, and font size. The result is a music player with a recognizable visual character that can still be made your own.
 
+## Screenshots
+
+> The screenshots use generated sample artwork and fictional tracks.
+
+| | |
+|---|---|
+| ![Player](docs/screenshots/player.png) | ![Library](docs/screenshots/library.png) |
+| **Player** — now playing, cover art, block visualizer, track list | **Library** — every track with its cover, grid or list view |
+| ![Context menu](docs/screenshots/context-menu.png) | ![Tag editor](docs/screenshots/tag-editor.png) |
+| **Right-click menu** — play next, add to queue or playlist, show in folder, info, edit, remove | **Tag editor** — file name, all tags and embedded cover art |
+| ![Play queue](docs/screenshots/queue.png) | ![Equalizer](docs/screenshots/equalizer.png) |
+| **Play queue** — reorder, remove, shuffle what plays next | **Equalizer** — 10 bands, preamp, presets and a live response curve |
+| ![Appearance](docs/screenshots/appearance.png) | ![English interface](docs/screenshots/english-library.png) |
+| **Appearance** — themes, backgrounds, visualizer, cover and widget options | **English (LTR)** — the whole interface also works left-to-right |
+
+<p align="center">
+  <img src="docs/screenshots/widget.png" alt="Desktop widget" width="390"><br>
+  <em>Compact desktop widget</em>
+</p>
+
+## Download
+
+Pre-built Windows packages are published on the [Releases](https://github.com/ZoroChanW/zoro-player/releases) page:
+
+- **`Zoro Player_<version>_x64-setup.exe`** — installer with a Start-menu entry and uninstaller.
+- **`Zoro-Player-portable-x64.exe`** — single portable executable (needs the WebView2 runtime, included with Windows 11 and current Windows 10).
+
+Releases are built automatically by GitHub Actions whenever a `v*` tag is pushed (or when the **Build & Release (Windows)** workflow is started manually).
+
 ## Features
 
 ### Music library
@@ -86,7 +115,7 @@ npm run dev
 
 ## Build
 
-Create the Windows NSIS installer:
+You can download ready-made builds from [Releases](https://github.com/ZoroChanW/zoro-player/releases). To build it yourself, create the Windows NSIS installer:
 
 ```powershell
 npm run build
