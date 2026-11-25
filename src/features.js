@@ -26,17 +26,21 @@ let lastSel = null;
 /* ═════════════════════════ playlists ═════════════════════════ */
 const savePL = () => store.set('playlists', playlists);
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-const plById = id => playlists.find(p => p.id === id) || null;
-Z.getPlaylistPaths = id => (plById(id) || { paths: [] }).paths;
+const SYS = Z.smart.SYS;
+const plById = id => playlists.find(p => p.id === id) || SYS.find(p => p.id === id) || null;
+const plName = p => (p.sys ? T(p.name) : p.name);
+const allLists = () => [...SYS, ...playlists];
+Z.getPlaylistPaths = id => plIdx(id).idx.map(i => st.lib[i].path);
 
 function plIdx(id) {                        // tracks of a playlist that exist in the library + count of missing ones
   const p = plById(id), idx = []; let missing = 0;
+  if (p && p.smart) return { idx: Z.smart.evaluate(p.rules), missing: 0 };
   if (p) p.paths.forEach(path => { const i = st.idx.get(path); if (i == null) missing++; else idx.push(i); });
   return { idx, missing };
 }
 function plChanged() {
   savePL();
-  if (st.plFilter) { const p = plById(st.plFilter.id); if (p) st.plFilter.name = p.name; else st.plFilter = null; Z.renderList(); }
+  if (st.plFilter) { const p = plById(st.plFilter.id); if (p) st.plFilter.name = plName(p); else st.plFilter = null; Z.renderList(); }
   renderPlPane();
   if (libOpen() && (lv.detail || lv.tab === 'playlists')) renderLib(); else updateLibCounts();
 }
@@ -52,25 +56,25 @@ function deletePlaylist(id) {
   plChanged(); Z.renderList();
 }
 function addToPlaylist(id, paths) {
-  const p = plById(id); if (!p) return 0;
+  const p = plById(id); if (!p || p.smart) return 0;
   const have = new Set(p.paths); let n = 0;
   paths.forEach(x => { if (!have.has(x)) { have.add(x); p.paths.push(x); n++; } });
   if (n) plChanged();
   return n;
 }
 function removeFromPlaylist(id, paths) {
-  const p = plById(id); if (!p) return;
+  const p = plById(id); if (!p || p.smart) return;
   const rm = new Set(paths); p.paths = p.paths.filter(x => !rm.has(x)); plChanged();
 }
 function movePl(id, path, dir) {
-  const p = plById(id); if (!p) return;
+  const p = plById(id); if (!p || p.smart) return;
   const k = p.paths.indexOf(path); if (k < 0) return;
   let j = k + dir;
   while (j >= 0 && j < p.paths.length && !st.idx.has(p.paths[j])) j += dir;      // skip unavailable entries
   if (j < 0 || j >= p.paths.length) return;
   const [x] = p.paths.splice(k, 1); p.paths.splice(j, 0, x); plChanged();
 }
-function pruneMissing(id) { const p = plById(id); if (p) { p.paths = p.paths.filter(x => st.idx.has(x)); plChanged(); } }
+function pruneMissing(id) { const p = plById(id); if (p && !p.smart) { p.paths = p.paths.filter(x => st.idx.has(x)); plChanged(); } }
 function playPlaylist(id, shuffle) {
   const { idx } = plIdx(id);
   if (!idx.length) { toast(T('این پلی‌لیست آهنگ قابل‌پخشی نداره')); return; }
@@ -86,19 +90,80 @@ async function newPlaylistDialog(paths = []) {
   return p;
 }
 async function renamePlaylistDialog(id) {
-  const p = plById(id); if (!p) return;
+  const p = plById(id); if (!p || p.sys) return;
   const name = await askText({ title: T('تغییر نام پلی‌لیست'), label: T('نام پلی‌لیست'), value: p.name, ok: T('ذخیره') });
   if (name) renamePlaylist(id, name);
 }
 async function deletePlaylistDialog(id) {
-  const p = plById(id); if (!p) return;
+  const p = plById(id); if (!p || p.sys) return;
   const ok = await confirmBox({ title: T('حذف پلی‌لیست'), text: T('پلی‌لیست «{name}» حذف بشه؟ آهنگ‌ها و فایل‌ها دست‌نخورده می‌مونن.', { name: p.name }), ok: T('حذف'), danger: true });
   if (ok) { deletePlaylist(id); toast(T('پلی‌لیست حذف شد')); }
 }
 
+/* smart playlists: rule editor */
+async function smartDialog(existing, tpl) {
+  const Sm = Z.smart;
+  const rules = existing || tpl ? JSON.parse(JSON.stringify((existing || tpl).rules)) : { match: 'all', conds: [{ f: 'rating', op: '>=', v: 4 }], sort: 'plays', limit: '' };
+  const wrap = document.createElement('div');
+  wrap.className = 'sp-edit';
+  wrap.innerHTML = `<label class="dlg-field"><span>${esc(T('نام پلی‌لیست'))}</span><input type="text" id="spName" maxlength="60" spellcheck="false"></label>
+    <div class="sp-match"><span>${esc(T('آهنگ‌هایی که'))}</span><select id="spMatch"><option value="all">${esc(T('همهٔ شرط‌ها'))}</option><option value="any">${esc(T('حداقل یکی از شرط‌ها'))}</option></select><span>${esc(T('رو داشته باشن'))}</span></div>
+    <div id="spConds" class="sp-conds"></div>
+    <button type="button" class="tbtn" id="spAdd">${esc(T('+ شرط جدید'))}</button>
+    <div class="sp-match"><span>${esc(T('مرتب‌سازی'))}</span><select id="spSort"></select><span>${esc(T('حداکثر تعداد'))}</span><input id="spLimit" type="number" min="1" max="5000" placeholder="${esc(T('نامحدود'))}"></div>
+    <p class="hint" id="spCount"></p>`;
+  const nameIn = $('#spName', wrap); nameIn.value = existing ? existing.name : tpl ? tpl.name : '';
+  $('#spMatch', wrap).value = rules.match === 'any' ? 'any' : 'all';
+  $('#spSort', wrap).innerHTML = Sm.SORTS.map(([k, l]) => `<option value="${k}">${esc(T(l))}</option>`).join('');
+  $('#spSort', wrap).value = rules.sort || 'title';
+  $('#spLimit', wrap).value = rules.limit || '';
+  const box = $('#spConds', wrap);
+  const count = () => {
+    const n = Sm.evaluate(rules).length;
+    $('#spCount', wrap).textContent = T('الان {n} آهنگ با این شرط‌ها می‌خونه', { n: fa(n) });
+  };
+  const draw = () => {
+    box.innerHTML = '';
+    rules.conds.forEach((c, k) => {
+      const row = document.createElement('div'); row.className = 'sp-row';
+      const kind = Sm.FIELDS[c.f];
+      row.innerHTML = `<select class="f">${Object.keys(Sm.FIELDS).map(f => `<option value="${f}"${f === c.f ? ' selected' : ''}>${esc(T(Sm.FIELD_LABEL[f]))}</option>`).join('')}</select>
+        <select class="op">${Sm.OPS[kind].map(([o, l]) => `<option value="${o}"${o === c.op ? ' selected' : ''}>${esc(T(l))}</option>`).join('')}</select>
+        ${kind === 'bool' ? `<select class="v"><option value="1"${+c.v ? ' selected' : ''}>${esc(T('بله'))}</option><option value="0"${+c.v ? '' : ' selected'}>${esc(T('خیر'))}</option></select>` : `<input class="v" type="${kind === 'num' ? 'number' : 'text'}" step="any" spellcheck="false">`}
+        <button type="button" class="sp-x" title="${esc(T('حذف'))}">&times;</button>`;
+      const vi = $('input.v', row); if (vi) vi.value = c.v == null ? '' : c.v;
+      on($('.f', row), 'change', e => { c.f = e.target.value; const k2 = Sm.FIELDS[c.f]; c.op = Sm.OPS[k2][0][0]; c.v = k2 === 'bool' ? 1 : ''; draw(); count(); });
+      on($('.op', row), 'change', e => { c.op = e.target.value; count(); });
+      on($('.v', row), 'input', e => { c.v = e.target.value; count(); });
+      on($('.v', row), 'change', e => { c.v = e.target.value; count(); });
+      on($('.sp-x', row), 'click', () => { rules.conds.splice(k, 1); draw(); count(); });
+      box.appendChild(row);
+    });
+  };
+  on($('#spAdd', wrap), 'click', () => { rules.conds.push({ f: 'year', op: '>=', v: '' }); draw(); count(); });
+  on($('#spMatch', wrap), 'change', e => { rules.match = e.target.value; count(); });
+  on($('#spSort', wrap), 'change', e => { rules.sort = e.target.value; count(); });
+  on($('#spLimit', wrap), 'input', e => { rules.limit = e.target.value; count(); });
+  draw(); count();
+  const r = await openModal({
+    title: existing ? T('ویرایش پلی‌لیست هوشمند') : T('پلی‌لیست هوشمند جدید'), body: wrap, wide: true,
+    buttons: [
+      { label: existing ? T('ذخیره') : T('ساختن'), primary: true, value: '__ok', act: () => { if (!nameIn.value.trim()) { nameIn.focus(); return false; } } },
+      { label: T('انصراف'), value: null },
+    ],
+  });
+  if (r !== '__ok') return null;
+  rules.conds = rules.conds.filter(c => Sm.FIELDS[c.f] === 'bool' || String(c.v).trim() !== '');
+  const name = nameIn.value.trim().slice(0, 60);
+  if (existing) { existing.name = name; existing.rules = rules; plChanged(); toast(T('ذخیره شد')); return existing; }
+  const p = { id: uid(), name, smart: true, rules, created: Date.now() };
+  playlists.push(p); plChanged(); toast(T('«{name}» ساخته شد', { name }));
+  return p;
+}
+
 /* playlist image (custom cover, stored as a small JPEG data URL) */
 async function setPlaylistImage(id) {
-  const p = plById(id); if (!p) return;
+  const p = plById(id); if (!p || p.sys) return;
   try {
     const path = await invoke('pick_image'); if (!path) return;
     const buf = await invoke('read_image', { path });
@@ -111,7 +176,7 @@ async function setPlaylistImage(id) {
     plChanged();
   } catch (e) { toast(T('خواندن تصویر ممکن نشد: {e}', { e: errText(e) })); }
 }
-function clearPlaylistImage(id) { const p = plById(id); if (p) { delete p.cover; plChanged(); } }
+function clearPlaylistImage(id) { const p = plById(id); if (p && !p.sys) { delete p.cover; plChanged(); } }
 
 /* ═════════════════════════ cover thumbnails (lazy, cached per album) ═════════════════════════ */
 const thumbs = new Map();       // key -> blob url | null | Promise
@@ -375,7 +440,8 @@ async function openEdit(i) {
 function applyEdit(oldPath, res, coverChanged) {
   const nt = res.track;
   if (nt.path !== oldPath) {
-    playlists.forEach(p => { const k = p.paths.indexOf(oldPath); if (k >= 0) p.paths[k] = nt.path; });
+    playlists.forEach(p => { if (!p.paths) return; const k = p.paths.indexOf(oldPath); if (k >= 0) p.paths[k] = nt.path; });
+    Z.stats.moveKey(oldPath, nt.path);
     savePL(); sel.delete(oldPath);
     if (lastSel === oldPath) lastSel = nt.path;
   }
@@ -412,7 +478,7 @@ function queueMany(idxs, mode) {
   if (queueOpen()) renderQueue();
 }
 function playlistSub(paths) {
-  const items = playlists.map(p => ({
+  const items = playlists.filter(p => !p.smart).map(p => ({
     label: `${p.name}  (${p.paths.length})`,
     act: () => { const n = addToPlaylist(p.id, paths); toast(n ? T('{n} آهنگ به «{name}» اضافه شد', { n, name: p.name }) : T('همه از قبل توی این پلی‌لیست بودن')); },
   }));
@@ -428,8 +494,11 @@ function trackMenu(idxs, opts = {}) {
     { label: T('افزودن به صف'), act: () => queueMany(idxs, 'end') },
     { sep: true },
     { label: T('افزودن به پلی‌لیست'), sub: playlistSub(paths) },
+    { sep: true },
+    { label: Z.stats.fav(t.path) && paths.every(Z.stats.fav) ? T('برداشتن از علاقه‌مندی‌ها') : T('افزودن به علاقه‌مندی‌ها ♥'), act: () => Z.stats.toggleFav(paths) },
+    { label: T('امتیاز'), sub: [0, 5, 4, 3, 2, 1].map(n => ({ label: n ? '★'.repeat(n) + '☆'.repeat(5 - n) : T('بدون امتیاز'), act: () => Z.stats.setRating(paths, n) })) },
   ];
-  if (opts.playlistId) {
+  if (opts.playlistId && !(plById(opts.playlistId) || {}).smart) {
     items.push({ label: many ? T('حذف از این پلی‌لیست ({n})', { n: idxs.length }) : T('حذف از این پلی‌لیست'), act: () => { clearSel(true); removeFromPlaylist(opts.playlistId, paths); } });
     if (!many) {
       items.push({ label: T('انتقال به بالا'), act: () => movePl(opts.playlistId, t.path, -1) });
@@ -448,18 +517,31 @@ function trackMenu(idxs, opts = {}) {
   items.push({ label: many ? T('حذف از برنامه ({n})', { n: idxs.length }) : T('حذف از برنامه'), danger: true, act: () => removeTracks(paths) });
   return items;
 }
+async function smartFrom(p) {
+  const base = { id: '', name: T(p.name), rules: JSON.parse(JSON.stringify(p.rules)) };
+  const made = await smartDialog(null, base);
+  return made;
+}
 function plMenu(id) {
   const p = plById(id); if (!p) return [];
   const { idx, missing } = plIdx(id);
+  if (p.sys) return [
+    { label: T('پخش'), act: () => playPlaylist(id, false), disabled: !idx.length },
+    { label: T('پخش تصادفی'), act: () => playPlaylist(id, true), disabled: !idx.length },
+    { label: T('باز کردن در کتابخانه'), act: () => openPlaylistInLib(id) },
+    { sep: true },
+    { label: T('ساخت پلی‌لیست هوشمند از روی این…'), act: () => smartFrom(p) },
+  ];
   const items = [
     { label: T('پخش'), act: () => playPlaylist(id, false), disabled: !idx.length },
     { label: T('پخش تصادفی'), act: () => playPlaylist(id, true), disabled: !idx.length },
     { label: T('باز کردن در کتابخانه'), act: () => openPlaylistInLib(id) },
     { sep: true },
+    ...(p.smart ? [{ label: T('ویرایش شرط‌ها…'), act: () => smartDialog(p) }] : []),
     { label: T('تغییر نام…'), act: () => renamePlaylistDialog(id) },
     { label: T('تغییر عکس…'), act: () => setPlaylistImage(id) },
     ...(p.cover ? [{ label: T('حذف عکس'), act: () => clearPlaylistImage(id) }] : []),
-    { label: T('ساخت کپی'), act: () => { createPlaylist(T('{name} (کپی)', { name: p.name }), p.paths); } },
+    { label: T('ساخت کپی'), act: () => { if (p.smart) { playlists.push({ id: uid(), name: T('{name} (کپی)', { name: p.name }), smart: true, rules: JSON.parse(JSON.stringify(p.rules)), created: Date.now() }); plChanged(); } else createPlaylist(T('{name} (کپی)', { name: p.name }), p.paths); } },
   ];
   if (missing) items.push({ label: T('پاک‌کردن موارد در دسترس‌نبوده ({n})', { n: missing }), act: () => pruneMissing(id) });
   items.push({ sep: true }, { label: T('حذف پلی‌لیست'), danger: true, act: () => deletePlaylistDialog(id) });
@@ -469,12 +551,13 @@ function plMenu(id) {
 /* ═════════════════════════ left panel: playlists tab, folders menu, restore ═════════════════════════ */
 function renderPlPane() {
   let html = '';
-  playlists.forEach(p => {
+  allLists().forEach(p => {
     const { idx, missing } = plIdx(p.id), on_ = st.plFilter && st.plFilter.id === p.id;
-    html += `<div class="folder-item${on_ ? ' on' : ''}" data-pl="${p.id}"><div class="fi${p.cover ? ' img' : ''}"${p.cover ? ` style="background-image:url('${p.cover}')"` : ''}>${p.cover ? '' : '&equiv;'}</div><div class="fm"><div class="fn" data-no-i18n>${esc(p.name)}</div><div class="fp">${fmtLong(totalDur(idx))}${missing ? ' · ' + esc(T('{n} در دسترس نیست', { n: missing })) : ''}</div></div><div class="fc">${esc(Z.nTracks(idx.length))}</div></div>`;
+    const icon = p.sys ? p.icon : p.smart ? '&#9881;' : '&equiv;';
+    html += `<div class="folder-item${on_ ? ' on' : ''}${p.sys ? ' sys' : ''}" data-pl="${p.id}"><div class="fi${p.cover ? ' img' : ''}"${p.cover ? ` style="background-image:url('${p.cover}')"` : ''}>${p.cover ? '' : icon}</div><div class="fm"><div class="fn" data-no-i18n>${esc(plName(p))}</div><div class="fp">${fmtLong(totalDur(idx))}${missing ? ' · ' + esc(T('{n} در دسترس نیست', { n: missing })) : ''}</div></div><div class="fc">${esc(Z.nTracks(idx.length))}</div></div>`;
   });
   $('#plList').innerHTML = html;
-  $('#plHint').hidden = playlists.length > 0;
+  $('#plHint').hidden = true;
   $('#cntPl').textContent = playlists.length || '';
 }
 function updateRestore() {
@@ -483,10 +566,11 @@ function updateRestore() {
   if (n) b.textContent = T('بازگرداندن آهنگ‌های حذف‌شده ({n})', { n });
 }
 on($('#btnNewPl'), 'click', () => newPlaylistDialog());
+on($('#btnNewSmart'), 'click', () => smartDialog(null));
 on($('#plList'), 'click', e => {
   const it = e.target.closest('[data-pl]'); if (!it) return;
   const p = plById(it.dataset.pl); if (!p) return;
-  if (st.plFilter && st.plFilter.id === p.id) st.plFilter = null; else { st.plFilter = { id: p.id, name: p.name }; st.folderFilter = null; }
+  if (st.plFilter && st.plFilter.id === p.id) st.plFilter = null; else { st.plFilter = { id: p.id, name: plName(p) }; st.folderFilter = null; }
   Z.renderList(); Z.renderFolders(); renderPlPane();
   if (st.plFilter) $$('.lib-tabs button')[0].click();
 });
@@ -530,19 +614,20 @@ function lvVisible() {
   return Z.sortIdx(idx, lv.sort);
 }
 const initial = t => ([...(t.title || '?')][0] || '?').toUpperCase();
+const rateBadge = path => { const r = Z.stats.rating(path), f = Z.stats.fav(path); return (f ? '<i class="hf">♥</i>' : '') + (r ? '<i class="st">' + '★'.repeat(r) + '</i>' : ''); };
 function cardHTML(i) {
   const t = st.lib[i], s = sel.has(t.path);
-  return `<div class="lc${i === st.cur ? ' on' : ''}${s ? ' sel' : ''}" data-i="${i}"><div class="lc-cover"><div class="lz" data-i="${i}"></div><b class="lc-ph">${esc(initial(t))}</b><span class="lc-ck" data-ck>${s ? '[x]' : '[ ]'}</span><span class="lc-pl">&gt;</span></div><div class="lc-t">${esc(t.title)}</div><div class="lc-a">${esc(t.artist || baseName(t.path))}</div></div>`;
+  return `<div class="lc${i === st.cur ? ' on' : ''}${s ? ' sel' : ''}" data-i="${i}"><div class="lc-cover"><div class="lz" data-i="${i}"></div><b class="lc-ph">${esc(initial(t))}</b><span class="lc-ck" data-ck>${s ? '[x]' : '[ ]'}</span><span class="lc-pl">&gt;</span>${Z.stats.fav(t.path) ? '<span class="lc-fav">♥</span>' : ''}</div><div class="lc-t">${esc(t.title)}</div><div class="lc-a">${esc(t.artist || baseName(t.path))}</div></div>`;
 }
 function rowHTML(i, n) {
   const t = st.lib[i], s = sel.has(t.path);
-  return `<div class="lr${i === st.cur ? ' on' : ''}${s ? ' sel' : ''}" data-i="${i}"><span class="lr-ck" data-ck>${s ? '[x]' : '[ ]'}</span><span class="lr-n">${String(n + 1).padStart(3, '0')}</span><div class="lr-c"><div class="lz" data-i="${i}"></div><b class="lc-ph">${esc(initial(t))}</b></div><div class="lr-m"><div class="lr-t">${esc(t.title)}</div><div class="lr-a">${esc(t.artist || baseName(t.path))}</div></div><div class="lr-al">${esc(t.album)}</div><div class="lr-d">${t.duration ? fmt(t.duration) : ''}</div></div>`;
+  return `<div class="lr${i === st.cur ? ' on' : ''}${s ? ' sel' : ''}" data-i="${i}"><span class="lr-ck" data-ck>${s ? '[x]' : '[ ]'}</span><span class="lr-n">${String(n + 1).padStart(3, '0')}</span><div class="lr-c"><div class="lz" data-i="${i}"></div><b class="lc-ph">${esc(initial(t))}</b></div><div class="lr-m"><div class="lr-t">${esc(t.title)}</div><div class="lr-a">${esc(t.artist || baseName(t.path))}</div></div><div class="lr-al">${esc(t.album)}</div><div class="lr-rt">${rateBadge(t.path)}</div><div class="lr-d">${t.duration ? fmt(t.duration) : ''}</div></div>`;
 }
 function plCardHTML(p) {
   const { idx, missing } = plIdx(p.id), cov = idx.slice(0, 4);
-  if (p.cover) return `<div class="lc pc" data-pl="${p.id}"><div class="lc-cover"><div class="lz has" style="background-image:url('${p.cover}')"></div></div><div class="lc-t">${esc(p.name)}</div><div class="lc-a">${esc(Z.nTracks(idx.length))} • ${fmtLong(totalDur(idx))}${missing ? ' • ' + esc(T('{n} در دسترس نیست', { n: missing })) : ''}</div></div>`;
-  const mosaic = cov.length >= 4 ? cov.map(i => `<div class="lz" data-i="${i}"></div>`).join('') : cov.length ? `<div class="lz one" data-i="${cov[0]}"></div>` : '<b class="lc-ph">&equiv;</b>';
-  return `<div class="lc pc" data-pl="${p.id}"><div class="lc-cover mosaic${cov.length >= 4 ? ' four' : ''}">${mosaic}</div><div class="lc-t">${esc(p.name)}</div><div class="lc-a">${esc(Z.nTracks(idx.length))} • ${fmtLong(totalDur(idx))}${missing ? ' • ' + esc(T('{n} در دسترس نیست', { n: missing })) : ''}</div></div>`;
+  if (p.cover) return `<div class="lc pc" data-pl="${p.id}"><div class="lc-cover"><div class="lz has" style="background-image:url('${p.cover}')"></div></div><div class="lc-t">${esc(plName(p))}</div><div class="lc-a">${esc(Z.nTracks(idx.length))} • ${fmtLong(totalDur(idx))}${missing ? ' • ' + esc(T('{n} در دسترس نیست', { n: missing })) : ''}</div></div>`;
+  const mosaic = cov.length >= 4 ? cov.map(i => `<div class="lz" data-i="${i}"></div>`).join('') : cov.length ? `<div class="lz one" data-i="${cov[0]}"></div>` : '<b class="lc-ph">' + (p.sys ? p.icon : p.smart ? '&#9881;' : '&equiv;') + '</b>';
+  return `<div class="lc pc" data-pl="${p.id}"><div class="lc-cover mosaic${cov.length >= 4 ? ' four' : ''}">${mosaic}</div><div class="lc-t">${esc(plName(p))}</div><div class="lc-a">${esc(Z.nTracks(idx.length))} • ${fmtLong(totalDur(idx))}${missing ? ' • ' + esc(T('{n} در دسترس نیست', { n: missing })) : ''}</div></div>`;
 }
 
 function setCtx(sc, list, mode, opts) {
@@ -585,31 +670,53 @@ function renderTracksView() {
   appendChunk(c);
 }
 function renderPlaylistsView() {
-  const sc = $('#lvPlScroll');
+  const sc = $('#lvPlScroll'), lists = allLists();
   $('#lvPlInfo').textContent = T('{n} پلی‌لیست', { n: playlists.length });
   const c = setCtx(sc, [], 'pl', {});
-  if (!playlists.length) { emptyMsg(sc, T('هنوز پلی‌لیستی نساختی.')); return; }
-  sc.innerHTML = playlists.map(plCardHTML).join('');
+  sc.innerHTML = lists.map(plCardHTML).join('');
   observeNew(c);
 }
 function renderDetail() {
   const p = plById(lv.detail.id);
   if (!p) { lv.detail = null; renderLib(); return; }
   const { idx, missing } = plIdx(p.id);
-  $('#lvDName').textContent = p.name;
+  $('#lvDName').textContent = (p.sys ? p.icon + ' ' : p.smart ? '⚙ ' : '') + plName(p);
+  $('#lvDImg').hidden = !!p.sys; $('#lvDRen').hidden = !!p.sys; $('#lvDDel').hidden = !!p.sys; $('#lvDEdit').hidden = !p.smart || !!p.sys;
   $('#lvDMeta').textContent = `${Z.nTracks(idx.length)} • ${fmtLong(totalDur(idx))}${missing ? ' • ' + T('{n} در دسترس نیست', { n: missing }) : ''}`;
   const sc = $('#lvDScroll'); sc.className = 'lv-scroll list';
-  const c = setCtx(sc, idx, 'list', { playlistId: p.id });
-  if (!idx.length) { emptyMsg(sc, T('این پلی‌لیست خالیه. از بخش «آهنگ‌ها» چند آهنگ رو انتخاب کن و «افزودن به پلی‌لیست» رو بزن.')); return; }
+  const c = setCtx(sc, idx, 'list', { playlistId: p.smart ? null : p.id });
+  if (!idx.length) { emptyMsg(sc, p.smart ? T('فعلاً هیچ آهنگی با این شرط‌ها نمی‌خونه. با گوش دادن، علاقه‌مندی و امتیاز دادن این لیست پر می‌شه.') : T('این پلی‌لیست خالیه. از بخش «آهنگ‌ها» چند آهنگ رو انتخاب کن و «افزودن به پلی‌لیست» رو بزن.')); return; }
   appendChunk(c);
 }
+const hoursText = s => { const h = s / 3600; return h >= 1 ? T('{n} ساعت', { n: fa(h.toFixed(1)) }) : T('{n} دقیقه', { n: fa(Math.round(s / 60)) }); };
+function renderStats() {
+  const o = Z.stats.overview(), box = $('#lvStatsBody');
+  const maxT = o.topTracks.length ? o.topTracks[0].n : 1, maxA = o.topArtists.length ? o.topArtists[0][1] : 1;
+  const bar = (n, max) => '█'.repeat(Math.max(1, Math.round(n / max * 16)));
+  const cards = [
+    [T('کل دفعات پخش'), fa(o.plays)], [T('زمان گوش‌دادن'), hoursText(o.secs)],
+    [T('آهنگ‌های شنیده‌شده'), `${fa(o.played)} / ${fa(o.total)}`], [T('علاقه‌مندی‌ها'), fa(o.favs)], [T('امتیازدار'), fa(o.rated)],
+  ].map(([k, v]) => `<div class="st-card"><b>${esc(v)}</b><span>${esc(k)}</span></div>`).join('');
+  const tr = o.topTracks.map((r, k) => { const t = st.lib[r.i]; return `<div class="st-row" data-i="${r.i}"><span class="st-n">${String(k + 1).padStart(2, '0')}</span><span class="st-t">${esc(t.title)}<small>${esc(t.artist || '')}</small></span><span class="st-b">${bar(r.n, maxT)}</span><span class="st-c">${fa(r.n)}</span></div>`; }).join('');
+  const ar = o.topArtists.map(([a, n], k) => `<div class="st-row"><span class="st-n">${String(k + 1).padStart(2, '0')}</span><span class="st-t">${esc(a)}</span><span class="st-b">${bar(n, maxA)}</span><span class="st-c">${fa(n)}</span></div>`).join('');
+  box.innerHTML = `<div class="st-cards">${cards}</div>` + (o.plays ? `<h4>${esc(T('پرتکرارترین آهنگ‌ها'))}</h4>${tr}<h4>${esc(T('پرتکرارترین هنرمندها'))}</h4>${ar || '<p class="hint">—</p>'}` : `<p class="hint">${esc(T('هنوز آماری ثبت نشده. هر آهنگی که حداقل ۳۰ ثانیه (یا نصفش) گوش بدی یک بار شمرده می‌شه.'))}</p>`) +
+    `<div class="btn-row"><button class="btn danger" id="stReset">${esc(T('پاک‌کردن همهٔ آمار، علاقه‌مندی‌ها و امتیازها'))}</button></div>`;
+}
+on($('#lvStatsBody'), 'click', async e => {
+  const r = e.target.closest('.st-row[data-i]');
+  if (r) { Z.playFrom(+r.dataset.i, [+r.dataset.i]); return; }
+  if (e.target.closest('#stReset')) {
+    const ok = await confirmBox({ title: T('پاک‌کردن آمار'), text: T('آمار پخش، علاقه‌مندی‌ها و امتیازها پاک بشن؟ این کار برگشت‌پذیر نیست.'), ok: T('پاک کن'), danger: true });
+    if (ok) { Z.stats.reset(); toast(T('آمار پاک شد')); }
+  }
+});
 function renderLib() {
-  const showTracks = lv.tab === 'tracks' && !lv.detail, showPl = lv.tab === 'playlists' && !lv.detail;
-  $('#lvTracks').hidden = !showTracks; $('#lvPlaylists').hidden = !showPl; $('#lvDetail').hidden = !lv.detail;
+  const showTracks = lv.tab === 'tracks' && !lv.detail, showPl = lv.tab === 'playlists' && !lv.detail, showStats = lv.tab === 'stats' && !lv.detail;
+  $('#lvTracks').hidden = !showTracks; $('#lvPlaylists').hidden = !showPl; $('#lvDetail').hidden = !lv.detail; $('#lvStats').hidden = !showStats;
   $$('#lvTabs button').forEach(b => b.classList.toggle('on', b.dataset.lt === lv.tab));
   updateLibCounts();
   [...sel].forEach(p => { if (!st.idx.has(p)) sel.delete(p); });
-  if (lv.detail) renderDetail(); else if (showTracks) renderTracksView(); else renderPlaylistsView();
+  if (lv.detail) renderDetail(); else if (showTracks) renderTracksView(); else if (showStats) renderStats(); else renderPlaylistsView();
   updateSelBar();
 }
 function openPlaylistInLib(id) {
@@ -686,10 +793,12 @@ on($('#lvSearch'), 'input', e => { clearTimeout(lvQT); lvQT = setTimeout(() => {
 on($('#lvSort'), 'change', e => { lv.sort = e.target.value; store.set('lvSort', lv.sort); renderTracksView(); });
 on($('#lvViewSeg'), 'click', e => { const b = e.target.closest('button[data-v]'); if (!b) return; lv.view = b.dataset.v; store.set('lvView', lv.view); renderTracksView(); });
 on($('#lvNewPl'), 'click', () => newPlaylistDialog());
+on($('#lvNewSmart'), 'click', () => smartDialog(null));
 on($('#lvBack'), 'click', () => { lv.detail = null; clearSel(true); renderLib(); });
 on($('#lvDPlay'), 'click', () => lv.detail && playPlaylist(lv.detail.id, false));
 on($('#lvDShuf'), 'click', () => lv.detail && playPlaylist(lv.detail.id, true));
 on($('#lvDImg'), 'click', () => lv.detail && setPlaylistImage(lv.detail.id));
+on($('#lvDEdit'), 'click', () => { const p = lv.detail && plById(lv.detail.id); if (p) smartDialog(p); });
 on($('#lvDRen'), 'click', () => lv.detail && renamePlaylistDialog(lv.detail.id));
 on($('#lvDDel'), 'click', () => lv.detail && deletePlaylistDialog(lv.detail.id));
 on($('#lvSelPlay'), 'click', () => { const idxs = selIdxs(); if (idxs.length) Z.playFrom(idxs[0], idxs); });
@@ -803,6 +912,15 @@ on(window, 'keydown', e => {
 
 on(document, 'zp:lib', () => { renderPlPane(); updateRestore(); renderLibIfOpen(); if (queueOpen()) renderQueue(); });
 on(document, 'zp:filter', renderPlPane);
+let stT = 0;
+on(document, 'zp:stats', () => {
+  clearTimeout(stT);
+  stT = setTimeout(() => {
+    renderPlPane();
+    if (st.plFilter && SYS.some(p => p.id === st.plFilter.id)) Z.renderList();
+    if (libOpen()) { if (lv.tab === 'tracks' && !lv.detail) { $$('#libSheet .lr-rt').forEach(el => { const r = el.closest('.lr'); if (r && st.lib[+r.dataset.i]) el.innerHTML = rateBadge(st.lib[+r.dataset.i].path); }); $$('#libSheet .lc').forEach(c => { const t = st.lib[+c.dataset.i]; if (!t) return; const cv = $('.lc-cover', c), f = $('.lc-fav', cv); if (Z.stats.fav(t.path) && !f) cv.insertAdjacentHTML('beforeend', '<span class="lc-fav">♥</span>'); else if (!Z.stats.fav(t.path) && f) f.remove(); }); } else renderLib(); }
+  }, 120);
+});
 on(document, 'zp:sheet', e => { const n = e.detail && e.detail.name; if (n === 'lib') { clearSel(true); renderLib(); } else if (n === 'queue') renderQueue(); });
 on(document, 'zp:track', () => {
   if (queueOpen()) renderQueue();

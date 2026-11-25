@@ -33,6 +33,11 @@ pub struct Track {
     pub artist: String,
     pub album: String,
     pub duration: f64,
+    /// release year, 0 = unknown
+    pub year: u32,
+    pub genre: String,
+    /// when the file appeared (creation time, falls back to mtime), ms since epoch
+    pub added: i64,
 }
 
 pub fn is_audio(p: &Path) -> bool {
@@ -60,7 +65,19 @@ fn basic_track(path: &Path) -> Track {
         artist: String::new(),
         album: String::new(),
         duration: 0.0,
+        year: 0,
+        genre: String::new(),
+        added: file_added(path),
     }
+}
+
+fn file_added(path: &Path) -> i64 {
+    std::fs::metadata(path)
+        .ok()
+        .and_then(|m| m.created().or_else(|_| m.modified()).ok())
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|d| d.as_millis() as i64)
+        .unwrap_or(0)
 }
 
 pub fn read_meta(path: &Path) -> Track {
@@ -80,6 +97,12 @@ pub fn read_meta(path: &Path) -> Track {
                 }
                 if let Some(v) = tag.album() {
                     t.album = v.trim().to_string();
+                }
+                if let Some(v) = tag.genre() {
+                    t.genre = v.trim().to_string();
+                }
+                if let Some(y) = tag.year() {
+                    t.year = y;
                 }
             }
         }

@@ -78,7 +78,7 @@ const DEF = {
   vizStyle: 'blocks', vizColor: 'accent', vizBars: 48, vizSens: 1,
   coverShape: 'square', coverSize: 300,
   widgetAuto: false, widgetTop: false, widgetOpacity: 96,
-  resume: true, trayClose: true, watch: true,
+  resume: true, trayClose: true, watch: true, gapless: true, xfade: 0,
 };
 const THEME_KEYS = ['scheme', 'bgMode', 'bgBlur', 'bgBright', 'gradA', 'gradB', 'gradAngle', 'solid', 'accentMode', 'accent', 'glass', 'radius', 'vignette', 'grayscale'];
 const THEMES = {
@@ -181,14 +181,17 @@ let eq = Object.assign({}, EQ_DEFAULT, store.get('eq', {}));
 if (!Array.isArray(eq.gains) || eq.gains.length !== 10) eq.gains = Array(10).fill(0);
 let customPresets = store.get('eqCustom', {});
 
-const audio = new Audio();
-audio.preload = 'auto';
+/* two players so the next track can be preloaded and overlapped (gapless / crossfade) */
+const players = [0, 1].map(() => { const el = new Audio(); el.preload = 'auto'; return { el, gain: null, url: null }; });
+let audio = players[0].el;                      // the active element
+const activePlayer = () => players.find(p => p.el === audio);
+const idlePlayer = () => players.find(p => p.el !== audio);
 let ctx, preamp, filters = [], curveFilters = [], analyser, limiter, master, freq, wave;
 
 function initAudio() {
   ctx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'playback' });
-  const src = ctx.createMediaElementSource(audio);
   preamp = ctx.createGain();
+  players.forEach(p => { p.gain = ctx.createGain(); ctx.createMediaElementSource(p.el).connect(p.gain); p.gain.connect(preamp); });
   filters = EQ_FREQS.map((f, i) => {
     const b = ctx.createBiquadFilter();
     b.type = i === 0 ? 'lowshelf' : i === EQ_FREQS.length - 1 ? 'highshelf' : 'peaking';
@@ -209,8 +212,8 @@ function initAudio() {
   analyser.maxDecibels = -12;
   limiter = ctx.createDynamicsCompressor();
   master = ctx.createGain();
-  let node = src;
-  [preamp, ...filters, analyser, limiter, master].forEach(n => { node.connect(n); node = n; });
+  let node = preamp;
+  [...filters, analyser, limiter, master].forEach(n => { node.connect(n); node = n; });
   master.connect(ctx.destination);
   freq = new Uint8Array(analyser.frequencyBinCount);
   wave = new Uint8Array(analyser.fftSize);
@@ -337,6 +340,7 @@ function sortIdx(idx, key) {
     duration: (a, b) => L[a].duration - L[b].duration,
   }[key];
   if (cmp) idx.sort(cmp);
+  else if (window.ZP && ZP.stats && ZP.stats.sortKeys.includes(key)) idx.sort((a, b) => (ZP.stats.value(b, key) - ZP.stats.value(a, key)) || loc(L[a].title, L[b].title));
   return idx;
 }
 function getVisible() {
@@ -504,6 +508,7 @@ async function playIndex(i, o = {}) {
   if (i < 0 || i >= st.lib.length) return;
   if (rebuild || st.order.indexOf(i) < 0) rebuildOrder(i, base || undefined);
   st.cur = i; st.pos = st.order.indexOf(i);
+  resetFade(); clearPre();
   const token = ++st.loadToken;
   const t = st.lib[i];
   setNowPlaying(t);
@@ -515,6 +520,7 @@ async function playIndex(i, o = {}) {
     if (token !== st.loadToken) return;
     const url = URL.createObjectURL(new Blob([buf], { type: isRiff(buf) ? 'audio/wav' : mimeFor(t.path) }));
     const old = st.blobUrl; st.blobUrl = url;
+    activePlayer().url = url; pre.bad = -1;
     audio.src = url;
     if (old) URL.revokeObjectURL(old);
     audio.playbackRate = +$('#speed').value || 1;
@@ -550,7 +556,7 @@ async function togglePlay() {
   if (audio.paused) {
     if (!audio.src) await playIndex(st.cur);
     else { try { await audio.play(); } catch { /* ignore */ } }
-  } else audio.pause();
+  } else { finishFade(); audio.pause(); }
 }
 function seekRatio(r) { const d = curDur(); if (d) { audio.currentTime = clamp(r, 0, 1) * d; updateSeek(true); } }
 
@@ -560,6 +566,94 @@ function handleEnded() {
   if (n >= 0) playIndex(n);
   else { setPlaying(false); audio.currentTime = 0; updateSeek(true); }
 }
+
+/* ═════════════ gapless / crossfade ═════════════
+   The next track is read into the idle <audio> while the current one plays; when the
+   current one is about to end (or `xfade` seconds before it) the idle one is started and
+   the two are mixed with equal-power gain curves. */
+const pre = { idx: -1, player: null, ready: false, token: 0, bad: -1 };
+const xf = { active: false, timer: 0 };
+function releasePlayer(pl) {
+  if (!pl || pl.el === audio) return;
+  try { pl.el.pause(); } catch { /* ignore */ }
+  pl.el.removeAttribute('src'); pl.el.load();
+  if (pl.url) { URL.revokeObjectURL(pl.url); pl.url = null; }
+}
+function clearPre() {
+  pre.token++;
+  if (pre.player) releasePlayer(pre.player);
+  pre.idx = -1; pre.player = null; pre.ready = false;
+}
+function finishFade() {
+  if (xf.active) { clearTimeout(xf.timer); xf.active = false; releasePlayer(idlePlayer()); }
+  if (ctx) { const now = ctx.currentTime; players.forEach(p => { p.gain.gain.cancelScheduledValues(now); p.gain.gain.setValueAtTime(p === activePlayer() ? 1 : 0, now); }); }
+}
+const resetFade = finishFade;
+function peekNext() {
+  if (st.repeat === 'one' || st.cur < 0 || !st.order.length) return -1;
+  const p = st.pos + 1;
+  if (p < st.order.length) return st.order[p];
+  return st.repeat === 'all' && !st.shuffle ? st.order[0] : -1;
+}
+async function preloadNext() {
+  const i = peekNext();
+  if (i < 0 || i === st.cur || xf.active || pre.idx === i || pre.bad === i) return;
+  clearPre();
+  const pl = idlePlayer(), my = pre.token;
+  pre.idx = i; pre.player = pl; pre.ready = false;
+  try {
+    const t = st.lib[i];
+    const buf = await invoke('read_audio', { path: t.path });
+    if (my !== pre.token) return;
+    const url = URL.createObjectURL(new Blob([buf], { type: isRiff(buf) ? 'audio/wav' : mimeFor(t.path) }));
+    pl.url = url; pl.el.src = url; pl.el.playbackRate = audio.playbackRate;
+    if (ctx) pl.gain.gain.setValueAtTime(0, ctx.currentTime);
+    await new Promise((res, rej) => {
+      const ok = () => { pl.el.removeEventListener('error', bad); res(); };
+      const bad = () => { pl.el.removeEventListener('canplay', ok); rej(new Error('preload')); };
+      pl.el.addEventListener('canplay', ok, { once: true });
+      pl.el.addEventListener('error', bad, { once: true });
+      pl.el.load();
+    });
+    if (my !== pre.token) return;
+    pre.ready = true;
+  } catch (e) {
+    if (my !== pre.token) return;
+    pre.bad = i; clearPre();                       // fall back to the normal load-on-end path
+  }
+}
+function transition(xs) {
+  const i = pre.idx, pl = pre.player, oldPl = activePlayer();
+  if (nextIndex(true) !== i) { clearPre(); return; }          // queue changed meanwhile
+  st.cur = i; st.pos = st.order.indexOf(i);
+  const token = ++st.loadToken, t = st.lib[i];
+  const now = ctx.currentTime;
+  [pl, oldPl].forEach(p => p.gain.gain.cancelScheduledValues(now));
+  if (xs > 0) {
+    const N = 64, up = new Float32Array(N), down = new Float32Array(N);
+    for (let k = 0; k < N; k++) { up[k] = Math.sin(k / (N - 1) * Math.PI / 2); down[k] = Math.cos(k / (N - 1) * Math.PI / 2); }
+    pl.gain.gain.setValueCurveAtTime(up, now, xs);
+    oldPl.gain.gain.setValueCurveAtTime(down, now, xs);
+  } else pl.gain.gain.setValueAtTime(1, now);
+  audio = pl.el; st.blobUrl = pl.url; pre.bad = -1;
+  pre.idx = -1; pre.player = null; pre.ready = false;
+  xf.active = true;
+  xf.timer = setTimeout(() => { xf.active = false; releasePlayer(oldPl); if (ctx) { oldPl.gain.gain.cancelScheduledValues(0); oldPl.gain.gain.value = 0; pl.gain.gain.cancelScheduledValues(0); pl.gain.gain.value = 1; } }, (xs > 0 ? xs : 0.4) * 1000 + 250);
+  pl.el.play().catch(() => {});
+  st.failStreak = 0;
+  setNowPlaying(t); updateActiveRow(true); loadCover(t, token); updateSeek(true);
+}
+function xfTick() {
+  if (!ctx || audio.paused || st.cur < 0 || xf.active) return;
+  const xs0 = +S.xfade || 0;
+  if (!S.gapless && xs0 <= 0) { if (pre.idx >= 0) clearPre(); return; }
+  const dur = curDur(); if (!(dur > 0)) return;
+  if (audio.currentTime > 1.5) preloadNext();
+  if (!pre.ready || pre.idx !== peekNext()) return;
+  const xs = Math.min(xs0, dur / 3), rem = (dur - audio.currentTime) / (audio.playbackRate || 1);
+  if (rem <= (xs > 0 ? xs : 0.05)) transition(xs);
+}
+setInterval(xfTick, 40);
 
 const playFrom = (i, base) => playIndex(i, { rebuild: true, base });
 
@@ -576,6 +670,7 @@ function queueInsert(i, mode, quiet) {
 
 function stopAndClear() {
   st.loadToken++;
+  finishFade(); clearPre();
   audio.pause(); audio.removeAttribute('src'); audio.load();
   if (st.blobUrl) { URL.revokeObjectURL(st.blobUrl); st.blobUrl = null; }
   st.cur = -1; st.pos = -1;
@@ -968,7 +1063,7 @@ function openSheet(name) {
 function closeSheets() { openSheet(null); }
 
 const fmtOut = (k, v) => ({
-  vizSens: (+v).toFixed(1) + '×', gradAngle: v + '°', radius: v + 'px', coverSize: v + 'px',
+  vizSens: (+v).toFixed(1) + '×', gradAngle: v + '°', xfade: v + ' s', radius: v + 'px', coverSize: v + 'px',
 }[k] || (v + '%'));
 function syncSettingsUI() {
   $$('[data-set]').forEach(el => {
@@ -1134,23 +1229,26 @@ function bindUI() {
   });
   window.addEventListener('resize', () => { if ($('#eqSheet').classList.contains('open')) drawEQCurve(); });
 
-  // audio element events
-  audio.addEventListener('play', () => { setPlaying(true); kick(); });
-  audio.addEventListener('pause', () => { setPlaying(false); updateSeek(true); });
-  audio.addEventListener('ended', handleEnded);
-  audio.addEventListener('seeked', smtcState);
-  audio.addEventListener('timeupdate', () => {
-    if (audio.paused) updateSeek();
-    if (st.widgetOpen) emitTo('widget', 'zp-tick', { pos: audio.currentTime, dur: curDur() }).catch(() => {});
-  });
-  audio.addEventListener('loadedmetadata', () => {          // formats without a readable duration (e.g. WMA)
-    const t = st.lib[st.cur];
-    if (t && !(t.duration > 0) && isFinite(audio.duration)) { t.duration = audio.duration; renderList(); }
-  });
-  ['loadedmetadata', 'durationchange', 'seeked'].forEach(ev => audio.addEventListener(ev, () => updateSeek(true)));
-  audio.addEventListener('error', () => {
-    if (!audio.src) return;
-    toast(T('این فایل قابل‌پخش نیست'));
+  // audio element events (both players; only the active one counts)
+  players.forEach(({ el }) => {
+    const live = fn => e => { if (el === audio) fn(e); };
+    el.addEventListener('play', live(() => { setPlaying(true); kick(); }));
+    el.addEventListener('pause', live(() => { setPlaying(false); updateSeek(true); }));
+    el.addEventListener('ended', live(handleEnded));
+    el.addEventListener('seeked', live(smtcState));
+    el.addEventListener('timeupdate', live(() => {
+      if (audio.paused) updateSeek();
+      if (st.widgetOpen) emitTo('widget', 'zp-tick', { pos: audio.currentTime, dur: curDur() }).catch(() => {});
+    }));
+    el.addEventListener('loadedmetadata', live(() => {          // formats without a readable duration (e.g. WMA)
+      const t = st.lib[st.cur];
+      if (t && !(t.duration > 0) && isFinite(audio.duration)) { t.duration = audio.duration; renderList(); }
+    }));
+    ['loadedmetadata', 'durationchange', 'seeked'].forEach(ev => el.addEventListener(ev, live(() => updateSeek(true))));
+    el.addEventListener('error', live(() => {
+      if (!audio.src) return;
+      toast(T('این فایل قابل‌پخش نیست'));
+    }));
   });
 
   // first user gesture unlocks the AudioContext
@@ -1252,7 +1350,7 @@ window.ZP = {
   st, store, toast, esc, fa, fmt, baseName, normPath, inFolder, invoke, listen, $, $$, clamp, appWindow,
   get S() { return S; }, get folders() { return folders; }, get files() { return files; }, get excluded() { return excluded; },
   getVisible, sortIdx, playFrom, playIndex, queueInsert, togglePlay, removeFromLibrary, restoreExcluded,
-  audio, nTracks, updateTrack, reloadCover, renderList, renderFolders, rescan, openSheet, closeSheets,
+  get audio() { return audio; }, nTracks, updateTrack, reloadCover, renderList, renderFolders, rescan, openSheet, closeSheets,
 };
 
 document.addEventListener('zp:lang', () => {

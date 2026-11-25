@@ -101,6 +101,7 @@
       <div class="lib-pane" id="panePlaylists" data-pane="playlists" hidden>
         <div class="folder-actions">
           <button class="btn primary" id="btnNewPl">+ پلی‌لیست جدید</button>
+          <button class="btn" id="btnNewSmart">+ هوشمند</button>
         </div>
         <p class="hint" id="plHint">هنوز پلی‌لیستی نساختی. روی هر آهنگ راست‌کلیک کن و «افزودن به پلی‌لیست» رو بزن، یا از بخش کتابخانه چند آهنگ رو با هم انتخاب کن.</p>
         <div data-no-i18n id="plList" class="folder-list"></div>
@@ -258,6 +259,8 @@
             <div class="field"><span>زبان</span><div class="seg"><button data-lang-set="fa">فارسی</button><button data-lang-set="en">English</button></div></div>
             <label class="switch"><input type="checkbox" data-set="watch"><i></i><span>پوشه‌ها رو زیر نظر بگیر و آهنگ‌های جدید رو خودکار اضافه کن</span></label>
             <label class="switch"><input type="checkbox" data-set="trayClose"><i></i><span>با بستن پنجره، برنامه به ترای بره (بسته نشه)</span></label>
+            <label class="switch"><input type="checkbox" data-set="gapless"><i></i><span>پخش بدون وقفه بین آهنگ‌ها (Gapless)</span></label>
+            <label class="field"><span>کراس‌فید بین آهنگ‌ها (۰ = خاموش)</span><input type="range" min="0" max="12" step="1" data-set="xfade"><output></output></label>
             <label class="switch"><input type="checkbox" data-set="resume"><i></i><span>ادامهٔ آخرین آهنگ هنگام باز شدن برنامه</span></label>
             <div class="btn-row"><button class="btn danger" id="resetAll">بازنشانی همهٔ تنظیمات ظاهر</button></div>
           </section>
@@ -331,6 +334,7 @@
         <div class="seg" id="lvTabs">
           <button class="on" data-lt="tracks">آهنگ‌ها <small id="lvCntT"></small></button>
           <button data-lt="playlists">پلی‌لیست‌ها <small id="lvCntP"></small></button>
+          <button data-lt="stats">آمار</button>
         </div>
         <button class="icon-btn" data-close title="بستن">&times;</button>
       </div>
@@ -353,6 +357,11 @@
               <option value="album">آلبوم</option>
               <option value="duration">مدت</option>
               <option value="path">ترتیب پوشه</option>
+              <option value="plays">بیشترین پخش</option>
+              <option value="last">آخرین پخش</option>
+              <option value="added">تازه‌ترین اضافه‌شده</option>
+              <option value="rating">امتیاز</option>
+              <option value="year">سال انتشار</option>
             </select>
             <div class="seg" id="lvViewSeg"><button data-v="grid">شبکه</button><button data-v="list">لیست</button></div>
             <span id="lvInfo" class="lv-info"></span>
@@ -363,11 +372,15 @@
         <div id="lvPlaylists" class="lv-view" hidden>
           <div class="lv-tools">
             <button class="btn primary" id="lvNewPl">+ پلی‌لیست جدید</button>
+            <button class="btn" id="lvNewSmart">+ پلی‌لیست هوشمند</button>
             <span id="lvPlInfo" class="lv-info"></span>
           </div>
           <div data-no-i18n id="lvPlScroll" class="lv-scroll grid"></div>
         </div>
 
+        <div id="lvStats" class="lv-view" hidden>
+          <div data-no-i18n id="lvStatsBody" class="stats-body"></div>
+        </div>
         <div id="lvDetail" class="lv-view" hidden>
           <div class="lv-dhead">
             <button class="tbtn" id="lvBack">بازگشت</button>
@@ -375,6 +388,7 @@
             <div class="btn-row">
               <button class="tbtn" id="lvDPlay">پخش</button>
               <button class="tbtn" id="lvDShuf">تصادفی</button>
+              <button class="tbtn" id="lvDEdit" hidden>ویرایش شرط‌ها</button>
               <button class="tbtn" id="lvDImg">عکس پلی‌لیست</button>
               <button class="tbtn" id="lvDRen">تغییر نام</button>
               <button class="tbtn danger" id="lvDDel">حذف پلی‌لیست</button>
@@ -436,6 +450,7 @@
 
 <script src="i18n.js"></script>
 <script src="app.js"></script>
+<script src="stats.js"></script>
 <script src="features.js"></script>
 <script src="spotify.js"></script>
 </body>

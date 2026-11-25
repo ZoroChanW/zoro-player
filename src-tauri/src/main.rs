@@ -281,6 +281,7 @@ async fn toggle_widget(
         }
     };
 
+    #[cfg_attr(not(windows), allow(unused_mut))]
     let mut wb = WebviewWindowBuilder::new(&app, "widget", WebviewUrl::App("widget.html".into()))
         .title("Zoro Widget")
         .inner_size(WIDGET_W, WIDGET_H)

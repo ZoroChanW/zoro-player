@@ -8,7 +8,7 @@ use std::sync::Mutex;
 use std::time::UNIX_EPOCH;
 
 /// Bump when the tag-reading logic changes so old cache rows are discarded.
-const SCHEMA_VERSION: i64 = 1;
+const SCHEMA_VERSION: i64 = 2;
 
 pub struct Db(Mutex<Connection>);
 
@@ -47,7 +47,10 @@ impl Db {
                 title TEXT NOT NULL,
                 artist TEXT NOT NULL,
                 album TEXT NOT NULL,
-                duration REAL NOT NULL
+                duration REAL NOT NULL,
+                year INTEGER NOT NULL DEFAULT 0,
+                genre TEXT NOT NULL DEFAULT '',
+                added INTEGER NOT NULL DEFAULT 0
             );",
         )?;
         c.pragma_update(None, "user_version", SCHEMA_VERSION)?;
@@ -60,13 +63,13 @@ impl Db {
             Err(_) => return HashMap::new(),
         };
         let mut out = HashMap::new();
-        if let Ok(mut st) = c.prepare("SELECT path,size,mtime,title,artist,album,duration FROM tracks") {
+        if let Ok(mut st) = c.prepare("SELECT path,size,mtime,title,artist,album,duration,year,genre,added FROM tracks") {
             if let Ok(rows) = st.query_map([], |r| {
                 let path: String = r.get(0)?;
                 Ok((
                     path.clone(),
                     ((r.get::<_, i64>(1)?, r.get::<_, i64>(2)?),
-                     Track { path, title: r.get(3)?, artist: r.get(4)?, album: r.get(5)?, duration: r.get(6)? }),
+                     Track { path, title: r.get(3)?, artist: r.get(4)?, album: r.get(5)?, duration: r.get(6)?, year: r.get(7)?, genre: r.get(8)?, added: r.get(9)? }),
                 ))
             }) {
                 for row in rows.flatten() {
@@ -85,9 +88,9 @@ impl Db {
         let Ok(tx) = c.transaction() else { return };
         for (s, t) in upserts {
             let _ = tx.execute(
-                "INSERT INTO tracks(path,size,mtime,title,artist,album,duration) VALUES(?1,?2,?3,?4,?5,?6,?7)
-                 ON CONFLICT(path) DO UPDATE SET size=?2,mtime=?3,title=?4,artist=?5,album=?6,duration=?7",
-                params![t.path, s.0, s.1, t.title, t.artist, t.album, t.duration],
+                "INSERT INTO tracks(path,size,mtime,title,artist,album,duration,year,genre,added) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)
+                 ON CONFLICT(path) DO UPDATE SET size=?2,mtime=?3,title=?4,artist=?5,album=?6,duration=?7,year=?8,genre=?9,added=?10",
+                params![t.path, s.0, s.1, t.title, t.artist, t.album, t.duration, t.year, t.genre, t.added],
             );
         }
         for p in deletes {
