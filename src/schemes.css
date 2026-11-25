@@ -1,0 +1,24 @@
+/* Colour schemes shared by the main window and the widget.
+   Default = Monochrome (Omarchy-style: pure black / white / greys). */
+:root {
+  --bg: #0a0a0a;
+  --panel: #0f0f0f;
+  --fg: #e8e8e8;
+  --fg2: #9a9a9a;
+  --fg3: #5a5a5a;
+  --line: #2a2a2a;
+  --accent: #e8e8e8;
+  --accent-rgb: 232, 232, 232;
+}
+body[data-scheme="mono"] {
+  --bg: #0a0a0a; --panel: #0f0f0f; --fg: #e8e8e8; --fg2: #9a9a9a; --fg3: #5a5a5a; --line: #2a2a2a;
+}
+body[data-scheme="paper"] {
+  --bg: #ececec; --panel: #f6f6f6; --fg: #111111; --fg2: #4a4a4a; --fg3: #8a8a8a; --line: #bdbdbd;
+}
+body[data-scheme="amber"] {
+  --bg: #0b0800; --panel: #100c00; --fg: #ffb000; --fg2: #b87f00; --fg3: #6e4a00; --line: #3a2a00;
+}
+body[data-scheme="phosphor"] {
+  --bg: #020a04; --panel: #030f06; --fg: #33ff66; --fg2: #1fae44; --fg3: #136b2a; --line: #0f3b1b;
+}

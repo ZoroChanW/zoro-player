@@ -1,0 +1,442 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Zoro Player</title>
+  <link rel="stylesheet" href="schemes.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body data-scheme="mono" data-bg="solid" data-cover="square">
+
+<!-- ───────── icon sprite ───────── -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></symbol>
+  <symbol id="i-prev" viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></symbol>
+  <symbol id="i-next" viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></symbol>
+  <symbol id="i-shuffle" viewBox="0 0 24 24"><path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/></symbol>
+  <symbol id="i-repeat" viewBox="0 0 24 24"><path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/></symbol>
+  <symbol id="i-repeat-one" viewBox="0 0 24 24"><path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4zm-4-2V9h-1l-2 1v1h1.5v4H13z"/></symbol>
+  <symbol id="i-volume" viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></symbol>
+  <symbol id="i-mute" viewBox="0 0 24 24"><path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 24 24"><path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></symbol>
+  <symbol id="i-eq" viewBox="0 0 24 24"><path d="M3 17v2h6v-2H3zM3 5v2h10V5H3zm10 16v-2h8v-2h-8v-2h-2v6h2zM7 9v2H3v2h4v2h2V9H7zm14 4v-2H11v2h10zm-6-4h2V7h4V5h-4V3h-2v6z"/></symbol>
+  <symbol id="i-palette" viewBox="0 0 24 24"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8zm-5.5 9c-.83 0-1.5-.67-1.5-1.5S5.67 9 6.5 9 8 9.67 8 10.5 7.33 12 6.5 12zm3-4C8.67 8 8 7.33 8 6.5S8.67 5 9.5 5s1.5.67 1.5 1.5S10.33 8 9.5 8zm5 0c-.83 0-1.5-.67-1.5-1.5S13.67 5 14.5 5s1.5.67 1.5 1.5S15.33 8 14.5 8zm3 4c-.83 0-1.5-.67-1.5-1.5S16.67 9 17.5 9s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></symbol>
+  <symbol id="i-widget" viewBox="0 0 24 24"><path d="M19 7h-8v6h8V7zm2-4H3c-1.1 0-2 .9-2 2v14c0 1.1.9 1.98 2 1.98h18c1.1 0 2-.88 2-1.98V5c0-1.1-.9-2-2-2zm0 16.01H3V4.98h18v14.03z"/></symbol>
+  <symbol id="i-min" viewBox="0 0 24 24"><path d="M6 19h12v2H6z"/></symbol>
+  <symbol id="i-max" viewBox="0 0 24 24"><path d="M4 4h16v16H4V4zm2 4v10h12V8H6z"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></symbol>
+  <symbol id="i-music" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></symbol>
+  <symbol id="i-file-add" viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm4 14h-3v3h-2v-3h-3v-2h3v-3h2v3h3v2zM13 9V3.5L18.5 9H13z"/></symbol>
+  <symbol id="i-image" viewBox="0 0 24 24"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></symbol>
+  <symbol id="i-viz" viewBox="0 0 24 24"><path d="M4 14h3v6H4zm5-6h3v12H9zm5 3h3v9h-3zm5-7h3v16h-3z"/></symbol>
+</svg>
+
+<!-- ───────── background ───────── -->
+<div id="bg" aria-hidden="true">
+  <div class="bg-layer" id="bgA"></div>
+  <div class="bg-layer" id="bgB"></div>
+  <div class="bg-aurora"><i></i></div>
+  <div class="bg-shade"></div>
+</div>
+
+<div id="app">
+  <!-- ───────── titlebar ───────── -->
+  <header id="titlebar" data-tauri-drag-region>
+    <div class="brand" data-tauri-drag-region>
+      <span data-tauri-drag-region>zoro-player</span><span class="dim" data-tauri-drag-region>~/music</span><i class="cursor"></i>
+    </div>
+    <div class="tb-actions">
+      <button class="tb-btn" id="btnLang" title="زبان / Language"><span>EN</span></button>
+      <button class="tb-btn" id="btnSpotify" title="Spotify" hidden><span>Spotify</span></button>
+      <button class="tb-btn" id="btnQueue" title="صف پخش (Q)"><span>صف</span></button>
+      <button class="tb-btn" id="btnLib" title="کتابخانه (L)"><span>کتابخانه</span></button>
+      <button class="tb-btn" id="btnWidget" title="ویجت دسکتاپ"><span>ویجت</span></button>
+      <button class="tb-btn" id="btnEq" title="اکولایزر (E)"><span>اکولایزر</span></button>
+      <button class="tb-btn" id="btnTheme" title="ظاهر و شخصی‌سازی"><span>ظاهر</span></button>
+    </div>
+    <div class="spacer" data-tauri-drag-region></div>
+    <div class="win-ctrls">
+      <button class="wc" id="wcMin" title="کوچک‌کردن">_</button>
+      <button class="wc" id="wcMax" title="بزرگ‌کردن">&#9633;</button>
+      <button class="wc close" id="wcClose" title="بستن">&times;</button>
+    </div>
+  </header>
+
+  <main id="main">
+    <!-- ───────── library (right side in RTL) ───────── -->
+    <aside id="library" class="tile" data-title="کتابخانه">
+      <div class="lib-tabs">
+        <button class="on" data-tab="tracks"><b>1</b>آهنگ‌ها<small id="cntTracks"></small></button>
+        <button data-tab="playlists"><b>2</b>پلی‌لیست<small id="cntPl"></small></button>
+        <button data-tab="folders"><b>3</b>پوشه‌ها<small id="cntFolders"></small></button>
+      </div>
+
+      <div class="lib-pane" id="paneTracks" data-pane="tracks">
+        <div class="lib-tools">
+          <label class="search"><input id="search" placeholder="جستجوی آهنگ، هنرمند، آلبوم…" autocomplete="off" spellcheck="false"></label>
+          <select id="sort" title="مرتب‌سازی">
+            <option value="path">ترتیب پوشه</option>
+            <option value="title">عنوان</option>
+            <option value="artist">هنرمند</option>
+            <option value="duration">مدت</option>
+          </select>
+        </div>
+        <div id="filterChip" class="filter-chip" hidden></div>
+        <div data-no-i18n id="list" class="list"></div>
+        <div id="empty" class="empty" hidden>
+          <div class="empty-ic"><svg class="i"><use href="#i-folder"/></svg></div>
+          <h3>هنوز آهنگی اضافه نشده</h3>
+          <p>پوشهٔ آهنگ‌هات رو انتخاب کن تا همهٔ آهنگ‌های داخلش، با زیرپوشه‌ها، اضافه بشن.</p>
+          <button class="btn primary" id="btnEmptyAdd"><svg class="i"><use href="#i-plus"/></svg>افزودن پوشه</button>
+        </div>
+        <div id="scanning" class="scanning" hidden><span class="spin"></span>در حال اسکن آهنگ‌ها…</div>
+      </div>
+
+      <div class="lib-pane" id="panePlaylists" data-pane="playlists" hidden>
+        <div class="folder-actions">
+          <button class="btn primary" id="btnNewPl">+ پلی‌لیست جدید</button>
+        </div>
+        <p class="hint" id="plHint">هنوز پلی‌لیستی نساختی. روی هر آهنگ راست‌کلیک کن و «افزودن به پلی‌لیست» رو بزن، یا از بخش کتابخانه چند آهنگ رو با هم انتخاب کن.</p>
+        <div data-no-i18n id="plList" class="folder-list"></div>
+      </div>
+
+      <div class="lib-pane" id="paneFolders" data-pane="folders" hidden>
+        <div class="folder-actions">
+          <button class="btn primary" id="btnAddFolder"><svg class="i"><use href="#i-plus"/></svg>افزودن پوشه</button>
+          <button class="btn" id="btnAddFiles"><svg class="i"><use href="#i-file-add"/></svg>افزودن فایل</button>
+          <button class="btn icon" id="btnRescan" title="اسکن مجدد"><svg class="i"><use href="#i-refresh"/></svg></button>
+        </div>
+        <p class="hint">می‌تونی پوشه یا فایل رو از اکسپلورر بکشی و روی پنجره رها کنی. روی هر پوشه راست‌کلیک کن تا گزینه‌هاش رو ببینی. فرمت‌های پشتیبانی‌شده: MP3، FLAC، WAV، OGG، Opus، M4A، AAC.</p>
+        <div class="folder-actions"><button class="btn" id="btnRestore" hidden></button></div>
+        <div id="folderList" class="folder-list"></div>
+      </div>
+    </aside>
+
+    <!-- ───────── stage ───────── -->
+    <section id="stage" class="tile active" data-title="در حال پخش">
+      <canvas id="viz"></canvas>
+
+      <div class="now">
+        <div class="cover-beat" id="coverBeat">
+          <div class="cover" id="cover">
+            <img id="coverImg" alt="" hidden>
+            <div class="cover-ph"><span>[ no cover ]</span></div>
+            <pre id="ascii"></pre>
+            <div class="vinyl-hole"></div>
+          </div>
+        </div>
+        <h1 data-no-i18n id="npTitle">آمادهٔ پخش</h1>
+        <p data-no-i18n id="npArtist" class="np-artist">یه پوشه اضافه کن و از آهنگ‌هات لذت ببر</p>
+        <p data-no-i18n id="npAlbum" class="np-album"></p>
+      </div>
+
+      <!-- Equalizer sheet -->
+      <div class="sheet" id="eqSheet">
+        <div class="sheet-head">
+          <h2><svg class="i"><use href="#i-eq"/></svg>اکولایزر</h2>
+          <label class="switch"><input type="checkbox" id="eqOn"><i></i><span>فعال</span></label>
+          <button class="icon-btn" data-close title="بستن"><svg class="i"><use href="#i-close"/></svg></button>
+        </div>
+        <div class="sheet-body eq-body">
+          <div class="chips" id="eqPresets"></div>
+          <div class="eq-curve-wrap"><canvas id="eqCurve"></canvas></div>
+          <div class="eq-bands" id="eqBands"></div>
+          <div class="eq-foot">
+            <label class="switch"><input type="checkbox" id="eqLimiter"><i></i><span>محافظ صدا (جلوگیری از اعوجاج)</span></label>
+            <div class="eq-save">
+              <input id="eqName" placeholder="نام پیش‌تنظیم من…" maxlength="24" autocomplete="off">
+              <button class="btn" id="eqSave">ذخیره</button>
+              <button class="btn" id="eqReset">بازنشانی</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Theme / customization sheet -->
+      <div class="sheet" id="themeSheet">
+        <div class="sheet-head">
+          <h2><svg class="i"><use href="#i-palette"/></svg>ظاهر و شخصی‌سازی</h2>
+          <button class="icon-btn" data-close title="بستن"><svg class="i"><use href="#i-close"/></svg></button>
+        </div>
+        <div class="sheet-body theme-body">
+
+          <section>
+            <h3>پوسته‌های آماده</h3>
+            <div class="chips" id="themeChips"></div>
+          </section>
+
+          <section>
+            <h3>پس‌زمینه</h3>
+            <div class="seg" data-set="bgMode">
+              <button data-v="cover">کاور محو</button>
+              <button data-v="aurora">شفق متحرک</button>
+              <button data-v="image">تصویر دلخواه</button>
+              <button data-v="gradient">گرادیان</button>
+              <button data-v="solid">رنگ ساده</button>
+            </div>
+            <label class="field" data-modes="cover image"><span>میزان محوشدن</span><input type="range" min="0" max="100" step="1" data-set="bgBlur"><output></output></label>
+            <label class="field" data-modes="cover image aurora"><span>روشنایی</span><input type="range" min="10" max="100" step="1" data-set="bgBright"><output></output></label>
+            <div class="field" data-modes="image">
+              <span>تصویر پس‌زمینه</span>
+              <div class="btn-row"><button class="btn" id="pickBg"><svg class="i"><use href="#i-image"/></svg>انتخاب تصویر…</button><button class="btn" id="clearBg">حذف</button></div>
+              <input type="file" id="bgFile" accept="image/*" hidden>
+            </div>
+            <div class="field" data-modes="gradient">
+              <span>رنگ‌های گرادیان</span>
+              <div class="btn-row"><input type="color" data-set="gradA"><input type="color" data-set="gradB"></div>
+            </div>
+            <label class="field" data-modes="gradient"><span>زاویه</span><input type="range" min="0" max="360" step="1" data-set="gradAngle"><output></output></label>
+            <div class="field" data-modes="solid"><span>رنگ</span><input type="color" data-set="solid"></div>
+            <label class="switch"><input type="checkbox" data-set="grayscale"><i></i><span>کاور و پس‌زمینه سیاه‌وسفید</span></label>
+            <label class="field"><span>تیرگی حاشیه‌ها</span><input type="range" min="0" max="100" step="1" data-set="vignette"><output></output></label>
+          </section>
+
+          <section>
+            <h3>رنگ تأکیدی</h3>
+            <div class="seg" data-set="accentMode">
+              <button data-v="auto">رنگ از کاور</button>
+              <button data-v="custom">انتخاب دستی</button>
+            </div>
+            <div class="field" data-need-accent><span>رنگ</span><input type="color" data-set="accent"></div>
+          </section>
+
+          <section>
+            <h3>شیشه و گوشه‌ها</h3>
+            <label class="field"><span>شفافیت پنل‌ها</span><input type="range" min="0" max="100" step="1" data-set="glass"><output></output></label>
+            <label class="field"><span>گردی گوشه‌ها</span><input type="range" min="0" max="36" step="1" data-set="radius"><output></output></label>
+            <label class="field"><span>اندازهٔ نوشته‌ها</span><input type="range" min="85" max="125" step="1" data-set="fontScale"><output></output></label>
+          </section>
+
+          <section>
+            <h3>ویژوالایزر</h3>
+            <div class="seg" data-set="vizStyle">
+              <button data-v="blocks">بلوکی</button>
+              <button data-v="bars">میله‌ای</button>
+              <button data-v="mirror">آینه‌ای</button>
+              <button data-v="wave">موج</button>
+              <button data-v="circle">دایره‌ای</button>
+              <button data-v="off">خاموش</button>
+            </div>
+            <div class="seg" data-set="vizColor">
+              <button data-v="accent">رنگ تأکیدی</button>
+              <button data-v="rainbow">رنگین‌کمان</button>
+            </div>
+            <div class="seg" data-set="vizBars">
+              <button data-v="32">۳۲ میله</button>
+              <button data-v="48">۴۸ میله</button>
+              <button data-v="64">۶۴ میله</button>
+              <button data-v="96">۹۶ میله</button>
+            </div>
+            <label class="field"><span>حساسیت</span><input type="range" min="0.4" max="2.5" step="0.1" data-set="vizSens"><output></output></label>
+          </section>
+
+          <section>
+            <h3>کاور</h3>
+            <div class="seg" data-set="coverShape">
+              <button data-v="square">مربع</button>
+              <button data-v="ascii">ASCII</button>
+              <button data-v="vinyl">صفحهٔ گرامافون</button>
+            </div>
+            <label class="field"><span>اندازه</span><input type="range" min="180" max="420" step="5" data-set="coverSize"><output></output></label>
+          </section>
+
+          <section>
+            <h3>ویجت دسکتاپ</h3>
+            <label class="switch"><input type="checkbox" data-set="widgetAuto"><i></i><span>با باز شدن برنامه، ویجت هم باز بشه</span></label>
+            <label class="switch"><input type="checkbox" data-set="widgetTop"><i></i><span>ویجت همیشه روی پنجره‌ها بمونه</span></label>
+            <label class="field"><span>شفافیت ویجت</span><input type="range" min="30" max="100" step="1" data-set="widgetOpacity"><output></output></label>
+          </section>
+
+          <section>
+            <h3>عمومی</h3>
+            <div class="field"><span>زبان</span><div class="seg"><button data-lang-set="fa">فارسی</button><button data-lang-set="en">English</button></div></div>
+            <label class="switch"><input type="checkbox" data-set="watch"><i></i><span>پوشه‌ها رو زیر نظر بگیر و آهنگ‌های جدید رو خودکار اضافه کن</span></label>
+            <label class="switch"><input type="checkbox" data-set="trayClose"><i></i><span>با بستن پنجره، برنامه به ترای بره (بسته نشه)</span></label>
+            <label class="switch"><input type="checkbox" data-set="resume"><i></i><span>ادامهٔ آخرین آهنگ هنگام باز شدن برنامه</span></label>
+            <div class="btn-row"><button class="btn danger" id="resetAll">بازنشانی همهٔ تنظیمات ظاهر</button></div>
+          </section>
+        </div>
+      </div>
+    </section>
+
+    <!-- ───────── play queue ───────── -->
+    <section id="queueSheet" class="sheet">
+      <div class="sheet-head">
+        <h2>صف پخش <small id="qCount"></small></h2>
+        <button class="tbtn" id="qShuffle">بُر زدن بعدی‌ها</button>
+        <button class="tbtn danger" id="qClear">پاک‌کردن بعدی‌ها</button>
+        <button class="icon-btn" data-close title="بستن">&times;</button>
+      </div>
+      <div class="sheet-body q-body"><div data-no-i18n id="qList" class="q-list"></div></div>
+    </section>
+
+    <!-- ───────── spotify ───────── -->
+    <section id="spSheet" class="sheet">
+      <div class="sheet-head">
+        <h2>Spotify <small id="spUser" data-no-i18n></small></h2>
+        <button class="tbtn danger" id="spOut" hidden>قطع اتصال</button>
+        <button class="icon-btn" data-close title="بستن">&times;</button>
+      </div>
+      <div class="sheet-body sp-body">
+        <div id="spSetup" class="sp-setup">
+          <h3>اتصال به Spotify</h3>
+          <p class="sp-note">پخش از خود اپ Spotify انجام می‌شه (اکولایزر و ویژوالایزر روش اثر نداره)؛ این‌جا فقط کنترل، جستجو و پلی‌لیست‌هاته. برای کنترل پخش، حساب Premium لازمه.</p>
+          <ol class="sp-steps">
+            <li>توی <button class="link" id="spDash" type="button">developer.spotify.com/dashboard</button> یه اپ بساز (گزینهٔ Web API).</li>
+            <li>این آدرس رو دقیقاً توی Redirect URIs اپ اضافه کن: <code id="spRedirect" data-no-i18n>http://127.0.0.1:43819/callback</code> <button class="tbtn" id="spCopy" type="button">کپی</button></li>
+            <li>Client ID اپ رو این‌جا بچسبون و وصل شو:</li>
+          </ol>
+          <div class="sp-conn"><input type="text" id="spClient" data-no-i18n placeholder="Client ID" spellcheck="false" autocomplete="off"><button class="btn primary" id="spConnect" type="button">اتصال</button></div>
+          <div class="sp-msg" id="spSetupMsg" hidden></div>
+        </div>
+        <div id="spMain" class="sp-main" hidden>
+          <div class="sp-np">
+            <div class="sp-cover" id="spCover"><span>no cover</span></div>
+            <div class="sp-title" id="spTitle" data-no-i18n>—</div>
+            <div class="sp-artist" id="spArtist" data-no-i18n></div>
+            <div class="sp-seek"><span id="spT0">0:00</span><input type="range" id="spSeek" min="0" max="1000" value="0"><span id="spT1">0:00</span></div>
+            <div class="sp-ctl">
+              <button class="tbtn" id="spShuf" title="پخش تصادفی">shuf</button>
+              <button class="tbtn" id="spPrev" title="قبلی">|&lt;&lt;</button>
+              <button class="tbtn big" id="spPlay" title="پخش / توقف">&gt;</button>
+              <button class="tbtn" id="spNext" title="بعدی">&gt;&gt;|</button>
+              <button class="tbtn" id="spRep" title="تکرار">rep</button>
+            </div>
+            <div class="sp-vol"><span>vol</span><input type="range" id="spVol" min="0" max="100" value="50"></div>
+            <div class="sp-dev"><select id="spDev" data-no-i18n></select><button class="tbtn" id="spDevR" title="به‌روزرسانی دستگاه‌ها">&#8635;</button></div>
+            <div class="sp-msg" id="spMsg" hidden></div>
+          </div>
+          <div class="sp-lib">
+            <div class="sp-tools">
+              <div class="seg" id="spTabs"><button data-t="search" class="on">جستجو</button><button data-t="playlists">پلی‌لیست‌ها</button></div>
+              <input type="text" id="spQ" placeholder="جستجوی آهنگ…" spellcheck="false" data-no-i18n-value>
+              <button class="tbtn" id="spBack" hidden>&larr; بازگشت</button>
+            </div>
+            <div id="spList" class="sp-list" data-no-i18n></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ───────── library sheet: all songs with covers, playlists ───────── -->
+    <section id="libSheet" class="sheet">
+      <div class="sheet-head">
+        <h2>کتابخانه</h2>
+        <div class="seg" id="lvTabs">
+          <button class="on" data-lt="tracks">آهنگ‌ها <small id="lvCntT"></small></button>
+          <button data-lt="playlists">پلی‌لیست‌ها <small id="lvCntP"></small></button>
+        </div>
+        <button class="icon-btn" data-close title="بستن">&times;</button>
+      </div>
+      <div class="sheet-body lv-body">
+        <div id="lvSelBar" class="lv-selbar" hidden>
+          <b id="lvSelN"></b>
+          <button class="tbtn" id="lvSelPlay">پخش</button>
+          <button class="tbtn" id="lvSelAdd">افزودن به پلی‌لیست</button>
+          <button class="tbtn" id="lvSelRmPl" hidden>حذف از پلی‌لیست</button>
+          <button class="tbtn danger" id="lvSelDel">حذف از برنامه</button>
+          <button class="tbtn" id="lvSelClear">لغو انتخاب</button>
+        </div>
+
+        <div id="lvTracks" class="lv-view">
+          <div class="lv-tools">
+            <label class="search"><input id="lvSearch" placeholder="جستجو در آهنگ، هنرمند، آلبوم…" autocomplete="off" spellcheck="false"></label>
+            <select id="lvSort" title="مرتب‌سازی">
+              <option value="title">عنوان</option>
+              <option value="artist">هنرمند</option>
+              <option value="album">آلبوم</option>
+              <option value="duration">مدت</option>
+              <option value="path">ترتیب پوشه</option>
+            </select>
+            <div class="seg" id="lvViewSeg"><button data-v="grid">شبکه</button><button data-v="list">لیست</button></div>
+            <span id="lvInfo" class="lv-info"></span>
+          </div>
+          <div data-no-i18n id="lvScroll" class="lv-scroll"></div>
+        </div>
+
+        <div id="lvPlaylists" class="lv-view" hidden>
+          <div class="lv-tools">
+            <button class="btn primary" id="lvNewPl">+ پلی‌لیست جدید</button>
+            <span id="lvPlInfo" class="lv-info"></span>
+          </div>
+          <div data-no-i18n id="lvPlScroll" class="lv-scroll grid"></div>
+        </div>
+
+        <div id="lvDetail" class="lv-view" hidden>
+          <div class="lv-dhead">
+            <button class="tbtn" id="lvBack">بازگشت</button>
+            <div class="lv-dtitle"><b id="lvDName"></b><span id="lvDMeta"></span></div>
+            <div class="btn-row">
+              <button class="tbtn" id="lvDPlay">پخش</button>
+              <button class="tbtn" id="lvDShuf">تصادفی</button>
+              <button class="tbtn" id="lvDImg">عکس پلی‌لیست</button>
+              <button class="tbtn" id="lvDRen">تغییر نام</button>
+              <button class="tbtn danger" id="lvDDel">حذف پلی‌لیست</button>
+            </div>
+          </div>
+          <div data-no-i18n id="lvDScroll" class="lv-scroll list"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ───────── playbar ───────── -->
+  <footer id="playbar" class="tile" data-title="پخش">
+    <div class="seek-row">
+      <span id="tCur">0:00</span>
+      <input type="range" id="seek" min="0" max="1000" step="1" value="0">
+      <span id="tDur">0:00</span>
+    </div>
+    <div class="ctl-row">
+      <div class="ctl-side vol">
+        <button class="tbtn" id="btnMute" title="بی‌صدا (M)">vol</button>
+        <input type="range" id="vol" min="0" max="100" step="1" value="80">
+        <output id="volOut">80</output>
+      </div>
+
+      <div class="ctl-main">
+        <button class="tbtn" id="btnShuffle" title="پخش تصادفی (S)">[ ] shuf</button>
+        <button class="tbtn" id="btnPrev" title="قبلی">|&lt;&lt;</button>
+        <button class="tbtn play-btn" id="btnPlay" title="پخش / توقف (Space)"><span class="ic-play">[ &gt; ]</span><span class="ic-pause">[ || ]</span></button>
+        <button class="tbtn" id="btnNext" title="بعدی">&gt;&gt;|</button>
+        <button class="tbtn" id="btnRepeat" title="تکرار (R)">[ ] rep</button>
+      </div>
+
+      <div class="ctl-side end">
+        <select id="speed" title="سرعت پخش">
+          <option value="0.75">0.75x</option>
+          <option value="1" selected>1.0x</option>
+          <option value="1.25">1.25x</option>
+          <option value="1.5">1.5x</option>
+          <option value="2">2.0x</option>
+        </select>
+        <button class="tbtn" id="btnViz" title="تغییر حالت ویژوالایزر (V)">[viz]</button>
+      </div>
+    </div>
+  </footer>
+  <div id="statusline"><span id="stMode">STOP</span><span id="stInfo"></span><span id="stTrack"></span><span id="stRight"></span></div>
+</div>
+
+<div id="dropHint"><div><svg class="i"><use href="#i-folder"/></svg><b>پوشه یا آهنگ‌ها رو اینجا رها کن</b></div></div>
+<div id="ctx" hidden></div>
+<div id="modal" hidden>
+  <div class="dlg" role="dialog" aria-modal="true">
+    <div class="dlg-head"><span id="dlgTitle"></span><button class="icon-btn" id="dlgX" title="بستن">&times;</button></div>
+    <div class="dlg-body" id="dlgBody"></div>
+    <div class="dlg-foot" id="dlgFoot"></div>
+  </div>
+</div>
+<div id="toast" role="status"></div>
+
+<script src="i18n.js"></script>
+<script src="app.js"></script>
+<script src="features.js"></script>
+<script src="spotify.js"></script>
+</body>
+</html>

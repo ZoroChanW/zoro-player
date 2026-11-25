@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>Zoro Widget</title>
+<link rel="stylesheet" href="schemes.css">
+<style>
+  @font-face { font-family: 'Vazirmatn'; src: url('fonts/Vazirmatn.woff2') format('woff2'); font-weight: 100 900; }
+  @font-face { font-family: 'JetBrains Mono'; src: url('fonts/JetBrainsMono-400.woff2') format('woff2'); font-weight: 400; }
+  @font-face { font-family: 'JetBrains Mono'; src: url('fonts/JetBrainsMono-700.woff2') format('woff2'); font-weight: 700; }
+  :root { --op: .96; --gray: 1; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; font-family: 'JetBrains Mono', 'Vazirmatn', monospace; font-size: 13px; color: var(--fg); user-select: none; -webkit-user-select: none; }
+  .card { position: absolute; inset: 2px; background: color-mix(in srgb, var(--panel) calc(var(--op) * 100%), transparent); border: 1px solid var(--fg); display: flex; flex-direction: column; }
+  .drag { position: absolute; inset: 0; z-index: 1; }
+  .strip { position: relative; z-index: 3; display: flex; align-items: center; justify-content: space-between; height: 22px; padding: 0 8px; border-bottom: 1px solid var(--line); font-size: 11px; color: var(--fg3); direction: ltr; pointer-events: none; }
+  .strip .mode { color: var(--bg); background: var(--accent); padding: 0 6px; font-weight: 700; margin-right: 6px; }
+  .strip .btns { pointer-events: auto; display: flex; gap: 2px; }
+  .strip button { padding: 0 5px; color: var(--fg3); font-size: 11px; }
+  .strip button:hover { background: var(--accent); color: var(--bg); }
+  .strip button.on { color: var(--accent); }
+  .content { position: relative; z-index: 2; flex: 1; display: flex; gap: 12px; padding: 10px 10px 4px; pointer-events: none; min-height: 0; }
+  .cover { width: 92px; height: 92px; flex: none; align-self: center; border: 1px solid var(--fg3); background: var(--panel) center/cover; display: grid; place-items: center; color: var(--fg3); font-size: 10px; filter: grayscale(var(--gray)); }
+  .cover.has span { display: none; }
+  .info { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; }
+  .title, .artist { unicode-bidi: plaintext; }
+  .title { font-weight: 700; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .title::before { content: '> '; color: var(--accent); direction: ltr; unicode-bidi: isolate; }
+  .artist { color: var(--fg2); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  canvas { width: 100%; height: 26px; margin: 4px 0 2px; }
+  .ctl { display: flex; gap: 6px; direction: ltr; }
+  .ctl button { pointer-events: auto; padding: 0 9px; border: 1px solid var(--line); color: var(--fg); font-size: 12px; line-height: 20px; cursor: pointer; }
+  .ctl button:hover { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+  #play { min-width: 52px; border-color: var(--fg); font-weight: 700; }
+  #play .pa { display: none; }
+  body.playing #play .pl { display: none; }
+  body.playing #play .pa { display: inline; }
+  .prog { position: relative; z-index: 3; height: 18px; margin: 0 10px; display: flex; align-items: center; gap: 8px; direction: ltr; cursor: pointer; font-size: 11px; color: var(--fg3); }
+  .prog .t { width: 36px; text-align: center; }
+  .prog i { flex: 1; height: 4px; background: var(--line); display: block; }
+  .prog b { display: block; height: 100%; width: 0; background: var(--accent); }
+  button { border: 0; background: none; font: inherit; cursor: pointer; }
+</style>
+</head>
+<body data-scheme="mono">
+<div class="card">
+  <div class="drag" data-tauri-drag-region></div>
+  <div class="strip">
+    <span><span class="mode" id="mode">STOP</span>zoro-player</span>
+    <span class="btns"><button id="pin" title="همیشه روی بقیه پنجره‌ها">pin</button><button id="close" title="بستن ویجت">x</button></span>
+  </div>
+  <div class="content">
+    <div class="cover" id="cover"><span>no cover</span></div>
+    <div class="info">
+      <div class="title" id="title">Zoro Player</div>
+      <div class="artist" id="artist"></div>
+      <canvas id="viz"></canvas>
+      <div class="ctl">
+        <button id="prev" title="قبلی">|&lt;&lt;</button>
+        <button id="play" title="پخش / توقف"><span class="pl">[ &gt; ]</span><span class="pa">[ || ]</span></button>
+        <button id="next" title="بعدی">&gt;&gt;|</button>
+      </div>
+    </div>
+  </div>
+  <div class="prog" id="prog"><span class="t" id="tc">0:00</span><i><b id="bar"></b></i><span class="t" id="td">0:00</span></div>
+</div>
+<script src="i18n.js"></script>
+<script src="widget.js"></script>
+</body>
+</html>
