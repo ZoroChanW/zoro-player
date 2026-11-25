@@ -1,0 +1,57 @@
+name: Build & Release (Windows)
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install JS dependencies
+        run: npm install
+
+      - name: Build and publish release
+        id: tauri
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tauriScript: npx tauri
+          tagName: ${{ github.ref_type == 'tag' && github.ref_name || 'v__VERSION__' }}
+          releaseName: 'Zoro Player v__VERSION__'
+          releaseBody: |
+            ## Zoro Player
+            - **Zoro Player_x64-setup.exe** — installer (Start-menu entry, uninstaller).
+            - **Zoro-Player-portable-x64.exe** — single portable executable, no install needed.
+
+            Requires Windows 10/11 (WebView2 is installed automatically by the installer; the portable build needs the WebView2 runtime, which ships with Windows 11 and recent Windows 10).
+            WMA / APE / WavPack playback needs `ffmpeg.exe` next to the app.
+          releaseDraft: false
+          prerelease: false
+
+      - name: Upload portable executable
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $ver = (Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).version
+          $tag = if ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME } else { "v$ver" }
+          Copy-Item src-tauri/target/release/zoro-player.exe Zoro-Player-portable-x64.exe
+          gh release upload $tag Zoro-Player-portable-x64.exe --clobber --repo $env:GITHUB_REPOSITORY
