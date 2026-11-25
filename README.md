@@ -1,54 +1,53 @@
 # Zoro Player
 
-A Windows desktop music player built with **Tauri 2, Rust, and vanilla JavaScript**. Zoro Player pairs a Persian-first, right-to-left interface with an English left-to-right option and a customizable, monochrome desktop aesthetic inspired by Omarchy.
+A Windows desktop music player built with **Tauri 2, Rust, and vanilla JavaScript**. Zoro Player combines a Persian-first, right-to-left interface with an English left-to-right option, powerful local-library tools, and a distinctive monochrome desktop design.
+
+## A distinctive visual identity
+
+Zoro Player is designed to feel less like a generic music app and more like a carefully crafted desktop environment. Its default **Monochrome** theme takes inspiration from Omarchy and terminal interfaces:
+
+- A restrained black-and-white palette, crisp thin borders, and carefully tiled panels.
+- Monospaced typography using JetBrains Mono, paired with Vazirmatn for Persian text.
+- A compact, information-dense library layout with a terminal-like track list.
+- A CAVA-inspired block visualizer and a minimal bottom status bar.
+- Cover art integrated into the interface without overwhelming its clean monochrome identity.
+
+The look is not locked to one style. Switch between **Monochrome**, **Mono + Cover**, **Paper**, **Amber**, and **Phosphor**, then fine-tune backgrounds, accent colors, blur, brightness, panel opacity, corner radius, cover presentation, and font size. The result is a music player with a recognizable visual character that can still be made your own.
 
 ## Features
 
 ### Music library
-- Add individual audio files or one or more folders, including nested subfolders.
+- Add individual audio files or multiple folders, including nested subfolders.
 - Drag and drop files or folders into the player.
-- Browse your collection in grid or list view, with cover art, search, sorting, and multi-selection.
-- Cache track metadata in SQLite so the library can load quickly; unchanged files do not need to be re-read.
-- Optionally watch music folders and detect added or removed files.
+- Browse tracks with cover art in grid or list view; search, sort, and multi-select.
+- Cache metadata in SQLite for fast startup and incremental rescanning.
+- Optionally watch music folders and refresh the library when files change.
 
 ### Playback and organization
 - Create, rename, duplicate, customize, reorder, and delete playlists.
-- Manage the play queue: add tracks, play a track next, reorder upcoming tracks, shuffle the queue, and remove tracks.
-- Use shuffle, repeat modes, playback speed, volume, mute, and media-key controls.
-- Resume the last played track when the app starts.
-- Remove tracks from the app without deleting the original files from disk.
-
-### Track information and audio
-- View track metadata and edit titles, artist and album information, tags, embedded artwork, and file names.
-- Display embedded cover art or discover common folder artwork files.
-- Use the 10-band equalizer with preamp, built-in and custom presets, a live frequency-response curve, and an optional limiter.
-- Choose from block, bar, mirrored, wave, and circular visualizers. Cover artwork reacts to bass.
-
-### Appearance and desktop integration
-- Choose from Monochrome, Mono + Cover, Paper, Amber, and Phosphor themes.
-- Customize backgrounds, accent colors, blur, brightness, panel opacity, corner radius, cover style, and font size.
-- Open a compact, transparent desktop widget with cover art, playback controls, and a visualizer.
+- Manage the play queue: add tracks, play next, reorder, shuffle, and remove tracks.
+- Shuffle, repeat modes, playback speed, volume, mute, media keys, and resume-last-track.
 - Keep playback running in the Windows system tray when the main window is closed.
 
+### Track details and audio
+- View and edit track titles, artist and album information, tags, embedded artwork, and file names.
+- Read embedded cover art or common folder artwork files.
+- 10-band equalizer with preamp, built-in and custom presets, live response curve, and optional limiter.
+- Block, bar, mirrored, wave, and circular visualizers; cover artwork reacts to bass.
+- Compact transparent desktop widget with cover art, playback controls, and a visualizer.
+
 ### Languages
-- Switch between Persian (RTL) and English (LTR).
-- The language selection also applies to the desktop widget.
+- Persian (RTL) and English (LTR) interfaces, including the desktop widget.
 
 ## Audio formats
 
-The library recognizes these file extensions:
+The library recognizes:
 
-`mp3`, `flac`, `wav`, `ogg`, `oga`, `opus`, `m4a`, `aac`, `weba`, `webm`, `wma`, `ape`, `wv`, `aif`, `aiff`, `aifc`, `caf`, `mka`, `mpc`, `tta`, `dsf`, and `dff`.
+`mp3`, `flac`, `wav`, `ogg`, `oga`, `opus`, `m4a`, `aac`, `weba`, `webm`, `wma`, `ape`, `wv`, `aif`, `aiff`, `aifc`, `caf`, `mka`, `mpc`, and `tta`.
 
-Playback depends on the format and the Windows WebView audio engine. Formats that the WebView cannot play natively are decoded to WAV by the Rust backend using **Symphonia**, with **FFmpeg** as a fallback for formats Symphonia cannot decode.
+Formats supported by the Windows WebView audio engine play directly. Other formats are decoded to WAV by the Rust backend using Symphonia, with FFmpeg as a fallback where needed.
 
-If FFmpeg is required, make `ffmpeg.exe` available in one of these locations:
-- Next to the Zoro Player executable.
-- In an `ffmpeg` subfolder next to the executable.
-- In the application's data directory.
-- On your system `PATH`.
-
-You can also set the `ZORO_FFMPEG` environment variable to the FFmpeg executable path.
+If FFmpeg is required, place `ffmpeg.exe` next to the application executable, in an `ffmpeg` subfolder beside it, or in the application's data directory. It can also be available through `PATH`, or selected with the `ZORO_FFMPEG` environment variable.
 
 ## Tech stack
 
@@ -57,9 +56,9 @@ You can also set the `ZORO_FFMPEG` environment variable to the FFmpeg executable
 | Desktop framework | [Tauri 2](https://tauri.app/) |
 | Backend | [Rust](https://www.rust-lang.org/) |
 | Frontend | HTML, CSS, vanilla JavaScript |
-| Audio metadata and tag editing | [Lofty](https://github.com/Serial-ATA/lofty) |
-| Audio decoding | [Symphonia](https://github.com/pdeljanov/Symphonia), with FFmpeg fallback |
-| Library metadata cache | SQLite via `rusqlite` |
+| Audio metadata and tags | [Lofty](https://github.com/Serial-ATA/lofty) |
+| Audio decoding | [Symphonia](https://github.com/pdeljanov/Symphonia), FFmpeg fallback |
+| Library cache | SQLite via `rusqlite` |
 | File discovery | `walkdir` |
 | Folder monitoring | `notify-debouncer-mini` |
 | Audio processing | Web Audio API |
@@ -67,32 +66,27 @@ You can also set the `ZORO_FFMPEG` environment variable to the FFmpeg executable
 
 ## Requirements
 
-To develop and build Zoro Player on Windows, install:
+To build Zoro Player on Windows, install:
 
 1. [Node.js](https://nodejs.org/)
 2. [Rust](https://www.rust-lang.org/tools/install) with the MSVC toolchain
-3. [Microsoft C++ Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) with the **Desktop development with C++** workload
+3. [Microsoft C++ Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) with **Desktop development with C++**
 4. [Microsoft Edge WebView2](https://developer.microsoft.com/microsoft-edge/webview2/) (usually already installed on Windows 10 and 11)
 
 ## Development
 
-Clone the repository and install the dependencies:
+Clone the repository and install dependencies:
 
 ```powershell
 git clone https://github.com/ZoroChanW/zoro-player.git
 cd zoro-player
 npm install
-```
-
-Start the desktop app in development mode:
-
-```powershell
 npm run dev
 ```
 
 ## Build
 
-Build the Windows NSIS installer:
+Create the Windows NSIS installer:
 
 ```powershell
 npm run build
@@ -102,14 +96,6 @@ The installer is generated under:
 
 ```
 src-tauri/target/release/bundle/nsis/
-```
-
-The project uses the Tauri CLI through the npm scripts. You can also install the Rust CLI and run the equivalent Cargo commands:
-
-```powershell
-cargo install tauri-cli --version "^2"
-cargo tauri dev
-cargo tauri build
 ```
 
 ## Keyboard shortcuts
@@ -130,13 +116,13 @@ cargo tauri build
 
 ## Data and privacy
 
-Zoro Player is designed for a local music collection. Track metadata is cached in a SQLite database in the application's data directory, while interface preferences and other frontend state are persisted locally by the app.
+Zoro Player is designed around a local music library. Track metadata is cached in a SQLite database in the application's data directory, while interface preferences and library-related state are persisted locally.
 
-Your music files remain in their original locations. Removing a track from Zoro Player removes it from the app's library; it does **not** delete the file from your disk.
+Your music files remain in their original locations. Removing a track from Zoro Player does **not** delete the file from disk.
 
 ## Fonts and licenses
 
-The project bundles [JetBrains Mono](https://www.jetbrains.com/lp/mono/) and [Vazirmatn](https://github.com/rastikerdar/vazirmatn). Their Open Font License texts are included in `src/fonts/`.
+The project bundles [JetBrains Mono](https://www.jetbrains.com/lp/mono/) and [Vazirmatn](https://github.com/rastikerdar/vazirmatn). Their Open Font License files are included in `src/fonts/`.
 
 ---
 
