@@ -1,6 +1,6 @@
 [package]
 name = "zoro-player"
-version = "1.0.0"
+version = "1.0.1"
 description = "Zoro Player - a Persian RTL music player with EQ, visualizer and desktop widget"
 edition = "2021"
 
