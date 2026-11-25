@@ -83,10 +83,11 @@ mod imp {
                 match m {
                     Msg::Meta { title, artist, album, cover, duration_ms } => {
                         let dur = if duration_ms > 0 { Some(Duration::from_millis(duration_ms)) } else { None };
-                        let mk = |c: Option<&str>| MediaMetadata { title: Some(&title), artist: Some(&artist), album: Some(&album), cover_url: c, duration: dur };
                         // a bad cover must not drop title / duration
-                        if mc.set_metadata(mk(cover.as_deref())).is_err() {
-                            let _ = mc.set_metadata(mk(None));
+                        let full = MediaMetadata { title: Some(&title), artist: Some(&artist), album: Some(&album), cover_url: cover.as_deref(), duration: dur };
+                        if mc.set_metadata(full).is_err() {
+                            let bare = MediaMetadata { title: Some(&title), artist: Some(&artist), album: Some(&album), cover_url: None, duration: dur };
+                            let _ = mc.set_metadata(bare);
                         }
                     }
                     Msg::State { playing, pos_ms } => {
