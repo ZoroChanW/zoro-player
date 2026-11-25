@@ -426,6 +426,10 @@ async fn smtc_update(
 fn main() {
     smtc::set_app_id();
     tauri::Builder::default()
+        // must be the first plugin: a second launch just brings the running app forward
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            show_main(app);
+        }))
         .manage(SmtcTx(Mutex::new(None)))
         .plugin(tauri_plugin_dialog::init())
         .on_window_event(|window, event| {
