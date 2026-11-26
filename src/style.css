@@ -559,3 +559,24 @@ html[dir=ltr] .field output { text-align: right; }
 .st-b { color: var(--accent); direction: ltr; font-size: .7rem; flex: none; width: 17ch; overflow: hidden; letter-spacing: -1px; }
 .st-c { flex: none; min-width: 2.4em; text-align: end; color: var(--fg2); font-size: .82rem; }
 .stats-body .btn-row { margin-top: 22px; }
+
+/* ───── updates ───── */
+.tb-btn.upd { color: var(--accent); }
+.tb-btn.upd b { font-weight: 600; }
+.upd-box { border: 1px solid var(--line); background: var(--panel); padding: 10px 12px; margin: 10px 0; display: flex; flex-direction: column; gap: 8px; }
+.upd-row { display: flex; justify-content: space-between; align-items: center; color: var(--fg2); font-size: .85rem; }
+.upd-row b { color: var(--fg); }
+.upd-status { font-size: .8rem; color: var(--fg3); min-height: 1.4em; }
+.upd-status.ok { color: var(--fg2); }
+.upd-status.new { color: var(--accent); }
+.upd-status.err { color: #e5786d; }
+.upd-dlg { display: flex; flex-direction: column; gap: 12px; }
+.upd-vers { display: flex; align-items: center; justify-content: center; gap: 14px; font-size: 1.15rem; color: var(--fg3); }
+.upd-vers b { color: var(--accent); }
+.upd-date { text-align: center; color: var(--fg3); font-size: .78rem; }
+.upd-notes { white-space: pre-wrap; max-height: 220px; overflow: auto; border: 1px solid var(--line); background: var(--panel); padding: 10px 12px; font-size: .82rem; line-height: 1.9; color: var(--fg2); }
+.upd-bar { height: 8px; border: 1px solid var(--line); background: var(--panel); }
+.upd-bar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .2s; }
+.upd-pct { text-align: center; color: var(--fg2); font-size: .8rem; margin-top: 6px; }
+#dlgFoot button:disabled { opacity: .45; cursor: default; }
+.upd-bar { direction: ltr; }

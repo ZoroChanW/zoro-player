@@ -367,6 +367,67 @@ fn set_tray_tooltip(app: AppHandle, text: String) {
     }
 }
 
+struct PendingUpdate(Mutex<Option<tauri_plugin_updater::Update>>);
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct UpdateInfo {
+    version: String,
+    current: String,
+    notes: Option<String>,
+    date: Option<String>,
+}
+
+#[tauri::command]
+fn app_version(app: AppHandle) -> String {
+    app.package_info().version.to_string()
+}
+
+/// Asks the release feed whether a newer signed build exists.
+#[tauri::command]
+async fn check_update(app: AppHandle, state: tauri::State<'_, PendingUpdate>) -> Result<Option<UpdateInfo>, String> {
+    use tauri_plugin_updater::UpdaterExt;
+    let up = app.updater().map_err(|e| e.to_string())?.check().await.map_err(|e| e.to_string())?;
+    let info = up.as_ref().map(|u| UpdateInfo {
+        version: u.version.clone(),
+        current: u.current_version.clone(),
+        notes: u.body.clone(),
+        date: u.date.map(|d| d.to_string()),
+    });
+    *state.0.lock().map_err(|e| e.to_string())? = up;
+    Ok(info)
+}
+
+/// Downloads + verifies (signature) + installs the update found by `check_update`,
+/// reporting progress to the UI as `zp-update` events.
+#[tauri::command]
+async fn install_update(app: AppHandle, state: tauri::State<'_, PendingUpdate>) -> Result<(), String> {
+    let up = state.0.lock().map_err(|e| e.to_string())?.take().ok_or_else(|| "no pending update".to_string())?;
+    let (a1, a2) = (app.clone(), app.clone());
+    let mut got: u64 = 0;
+    let mut last_pct: i64 = -1;
+    up.download_and_install(
+        move |chunk, total| {
+            got += chunk as u64;
+            let pct = total.filter(|t| *t > 0).map(|t| (got * 100 / t) as i64).unwrap_or(-1);
+            if pct != last_pct || pct < 0 {
+                last_pct = pct;
+                let _ = a1.emit("zp-update", serde_json::json!({ "got": got, "total": total, "pct": pct }));
+            }
+        },
+        move || {
+            let _ = a2.emit("zp-update", serde_json::json!({ "done": true }));
+        },
+    )
+    .await
+    .map_err(|e| e.to_string())?;
+    // On Windows the installer takes over and restarts the app by itself.
+    #[cfg(not(windows))]
+    app.restart();
+    #[allow(unreachable_code)]
+    Ok(())
+}
+
 struct SmtcTx(Mutex<Option<Sender<smtc::Msg>>>);
 static COVER_N: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
 
@@ -431,6 +492,8 @@ fn main() {
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             show_main(app);
         }))
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .manage(PendingUpdate(Mutex::new(None)))
         .manage(SmtcTx(Mutex::new(None)))
         .plugin(tauri_plugin_dialog::init())
         .on_window_event(|window, event| {
@@ -520,7 +583,10 @@ fn main() {
             set_close_to_tray,
             set_tray_labels,
             set_tray_tooltip,
-            smtc_update
+            smtc_update,
+            app_version,
+            check_update,
+            install_update
         ])
         .run(tauri::generate_context!())
         .expect("error while running Zoro Player");

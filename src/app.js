@@ -78,7 +78,7 @@ const DEF = {
   vizStyle: 'blocks', vizColor: 'accent', vizBars: 48, vizSens: 1,
   coverShape: 'square', coverSize: 300,
   widgetAuto: false, widgetTop: false, widgetOpacity: 96,
-  resume: true, trayClose: true, watch: true, gapless: true, xfade: 0,
+  resume: true, trayClose: true, watch: true, gapless: true, xfade: 0, autoUpdate: true,
 };
 const THEME_KEYS = ['scheme', 'bgMode', 'bgBlur', 'bgBright', 'gradA', 'gradB', 'gradAngle', 'solid', 'accentMode', 'accent', 'glass', 'radius', 'vignette', 'grayscale'];
 const THEMES = {

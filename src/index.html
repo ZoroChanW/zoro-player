@@ -52,6 +52,7 @@
       <span data-tauri-drag-region>zoro-player</span><span class="dim" data-tauri-drag-region>~/music</span><i class="cursor"></i>
     </div>
     <div class="tb-actions">
+      <button class="tb-btn upd" id="btnUpdate" hidden title="به‌روزرسانی"><span>&uarr; <b id="updBadge"></b></span></button>
       <button class="tb-btn" id="btnLang" title="زبان / Language"><span>EN</span></button>
       <button class="tb-btn" id="btnSpotify" title="Spotify" hidden><span>Spotify</span></button>
       <button class="tb-btn" id="btnQueue" title="صف پخش (Q)"><span>صف</span></button>
@@ -262,6 +263,12 @@
             <label class="switch"><input type="checkbox" data-set="gapless"><i></i><span>پخش بدون وقفه بین آهنگ‌ها (Gapless)</span></label>
             <label class="field"><span>کراس‌فید بین آهنگ‌ها (۰ = خاموش)</span><input type="range" min="0" max="12" step="1" data-set="xfade"><output></output></label>
             <label class="switch"><input type="checkbox" data-set="resume"><i></i><span>ادامهٔ آخرین آهنگ هنگام باز شدن برنامه</span></label>
+            <div class="upd-box">
+              <div class="upd-row"><span>نسخهٔ فعلی</span><b id="updVer" dir="ltr">—</b></div>
+              <div class="upd-status" id="updStatus" data-no-i18n></div>
+              <div class="btn-row"><button class="btn" id="updCheck">بررسی به‌روزرسانی</button></div>
+            </div>
+            <label class="switch"><input type="checkbox" data-set="autoUpdate"><i></i><span>بررسی خودکار به‌روزرسانی هنگام باز شدن برنامه</span></label>
             <div class="btn-row"><button class="btn danger" id="resetAll">بازنشانی همهٔ تنظیمات ظاهر</button></div>
           </section>
         </div>
@@ -452,6 +459,7 @@
 <script src="app.js"></script>
 <script src="stats.js"></script>
 <script src="features.js"></script>
+<script src="updater.js"></script>
 <script src="spotify.js"></script>
 </body>
 </html>

@@ -27,22 +27,28 @@ jobs:
       - name: Install JS dependencies
         run: npm install
 
+      - name: Read release notes
+        id: notes
+        shell: pwsh
+        run: |
+          $body = Get-Content RELEASE_NOTES.md -Raw -Encoding utf8
+          $d = "EOF_" + [guid]::NewGuid().ToString('N')
+          "body<<$d`n$body`n$d" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
       - name: Build and publish release
         id: tauri
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # signs the installer so the in-app updater can verify it
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tauriScript: npx tauri
           tagName: ${{ github.ref_type == 'tag' && github.ref_name || 'v__VERSION__' }}
           releaseName: 'Zoro Player v__VERSION__'
-          releaseBody: |
-            ## Zoro Player
-            - **Zoro Player_x64-setup.exe** — installer (Start-menu entry, uninstaller).
-            - **Zoro-Player-portable-x64.exe** — single portable executable, no install needed.
-
-            Requires Windows 10/11 (WebView2 is installed automatically by the installer; the portable build needs the WebView2 runtime, which ships with Windows 11 and recent Windows 10).
-            WMA / APE / WavPack playback needs `ffmpeg.exe` next to the app.
+          releaseBody: ${{ steps.notes.outputs.body }}
+          includeUpdaterJson: true
           releaseDraft: false
           prerelease: false
 

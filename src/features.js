@@ -292,6 +292,7 @@ function openModal({ title, body, buttons = [], wide = false, dismiss = true, on
     if (f) { f.focus(); if (f.select && f.tagName === 'INPUT') f.select(); }
   });
 }
+Z.openModal = openModal; Z.closeModal = closeModal;
 on(modal, 'mousedown', e => { downOnBackdrop = e.target === modal; });
 on(modal, 'mouseup', e => { if (downOnBackdrop && e.target === modal && modalState && modalState.dismiss) closeModal(null); downOnBackdrop = false; });
 on($('#dlgX'), 'click', () => { if (modalState && modalState.dismiss) closeModal(null); });
