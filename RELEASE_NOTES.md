@@ -5,3 +5,5 @@ Zoro Player 1.2.2
 
 Downloads: Zoro Player_x64-setup.exe (installer, supports auto-update) or Zoro-Player-portable-x64.exe (no install, update manually).
 WMA / APE / WavPack playback needs ffmpeg.exe next to the app.
+
+Build trigger: 1.2.2

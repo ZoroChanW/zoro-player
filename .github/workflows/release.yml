@@ -3,6 +3,10 @@ name: Build & Release (Windows)
 on:
   push:
     tags: ['v*']
+    # editing RELEASE_NOTES.md on main also starts a release build (handy when the
+    # "Run workflow" button is not available in the Actions UI)
+    branches: [main]
+    paths: ['RELEASE_NOTES.md']
   workflow_dispatch:
 
 permissions:
