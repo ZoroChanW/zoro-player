@@ -206,7 +206,13 @@ function requestThumb(t, cb) {
   if (v !== undefined) { if (v instanceof Promise) v.then(cb); else cb(v); return; }
   const p = new Promise(res => { tq.push({ t, res }); });
   thumbs.set(k, p);
-  p.then(url => { thumbs.set(k, url); cb(url); });
+  p.then(url => {
+    thumbs.set(k, url); cb(url);
+    if (thumbs.size > 700) {                                   // bound memory: drop the oldest finished thumbnails
+      let n = thumbs.size - 600;
+      for (const [key, v] of thumbs) { if (n-- <= 0) break; if (key !== k && typeof v === 'string') { URL.revokeObjectURL(v); thumbs.delete(key); } }
+    }
+  });
   pumpThumbs();
 }
 

@@ -182,7 +182,7 @@ if (!Array.isArray(eq.gains) || eq.gains.length !== 10) eq.gains = Array(10).fil
 let customPresets = store.get('eqCustom', {});
 
 /* two players so the next track can be preloaded and overlapped (gapless / crossfade) */
-const players = [0, 1].map(() => { const el = new Audio(); el.preload = 'auto'; return { el, gain: null, url: null }; });
+const players = [0, 1].map(() => { const el = new Audio(); el.crossOrigin = 'anonymous'; el.preload = 'auto'; return { el, gain: null, url: null }; });
 let audio = players[0].el;                      // the active element
 const activePlayer = () => players.find(p => p.el === audio);
 const idlePlayer = () => players.find(p => p.el !== audio);
@@ -501,6 +501,13 @@ function prevIndex() {
 const curDur = () => (isFinite(audio.duration) && audio.duration > 0 ? audio.duration : (st.lib[st.cur] ? st.lib[st.cur].duration : 0));
 const MIME = { mp3: 'audio/mpeg', flac: 'audio/flac', wav: 'audio/wav', ogg: 'audio/ogg', oga: 'audio/ogg', opus: 'audio/ogg', m4a: 'audio/mp4', aac: 'audio/aac', weba: 'audio/webm', webm: 'audio/webm' };
 const isRiff = b => { const u = new Uint8Array(b, 0, Math.min(4, b.byteLength)); return u.length === 4 && u[0] === 82 && u[1] === 73 && u[2] === 70 && u[3] === 70; };
+/* Streaming: plain files are played straight from disk through Tauri's asset protocol (range requests),
+   so the whole file never sits in WebView memory. Formats that need decoding fall back to the Blob path. */
+const toSrc = window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.convertFileSrc;
+async function streamSrc(path) {
+  if (!toSrc) return null;
+  try { return (await invoke('prepare_stream', { path })) ? toSrc(path) : null; } catch { return null; }
+}
 const mimeFor = p => MIME[(p.split('.').pop() || '').toLowerCase()] || 'audio/mpeg';
 
 async function playIndex(i, o = {}) {
@@ -515,12 +522,18 @@ async function playIndex(i, o = {}) {
   updateActiveRow(true);
   loadCover(t, token);
   document.body.classList.add('loading');
+  let stream = false;
   try {
-    const buf = await invoke(o.decoded ? 'decode_audio' : 'read_audio', { path: t.path });
+    let url = (o.decoded || o.noStream) ? null : await streamSrc(t.path);
     if (token !== st.loadToken) return;
-    const url = URL.createObjectURL(new Blob([buf], { type: isRiff(buf) ? 'audio/wav' : mimeFor(t.path) }));
-    const old = st.blobUrl; st.blobUrl = url;
-    activePlayer().url = url; pre.bad = -1;
+    stream = !!url;
+    if (!url) {
+      const buf = await invoke(o.decoded ? 'decode_audio' : 'read_audio', { path: t.path });
+      if (token !== st.loadToken) return;
+      url = URL.createObjectURL(new Blob([buf], { type: isRiff(buf) ? 'audio/wav' : mimeFor(t.path) }));
+    }
+    const old = st.blobUrl; st.blobUrl = stream ? null : url;
+    activePlayer().url = stream ? null : url; pre.bad = -1;
     audio.src = url;
     if (old) URL.revokeObjectURL(old);
     audio.playbackRate = +$('#speed').value || 1;
@@ -531,6 +544,7 @@ async function playIndex(i, o = {}) {
   } catch (e) {
     if (token !== st.loadToken || (e && e.name === 'AbortError')) return;
     console.error('play', e);
+    if (stream && !o.noStream && e && e.name === 'NotSupportedError') { o.noStream = true; document.body.classList.remove('loading'); return playIndex(i, o); }   // stream refused: read the file instead
     if (!o.decoded && e && e.name === 'NotSupportedError') { o.decoded = true; document.body.classList.remove('loading'); return playIndex(i, o); }   // WebView refused it: decode in Rust
     if (String(e).includes('FFMPEG_MISSING')) { toast(T('برای پخش این فرمت (WMA / APE / WavPack…) فایل ffmpeg.exe لازمه؛ کنار برنامه بذارش.')); st.failStreak = 9; return; }
     toast(T('پخش این آهنگ ممکن نشد: {name}', { name: baseName(t.path) }));
@@ -603,10 +617,14 @@ async function preloadNext() {
   pre.idx = i; pre.player = pl; pre.ready = false;
   try {
     const t = st.lib[i];
-    const buf = await invoke('read_audio', { path: t.path });
+    let url = await streamSrc(t.path), blob = false;
     if (my !== pre.token) return;
-    const url = URL.createObjectURL(new Blob([buf], { type: isRiff(buf) ? 'audio/wav' : mimeFor(t.path) }));
-    pl.url = url; pl.el.src = url; pl.el.playbackRate = audio.playbackRate;
+    if (!url) {
+      const buf = await invoke('read_audio', { path: t.path });
+      if (my !== pre.token) return;
+      url = URL.createObjectURL(new Blob([buf], { type: isRiff(buf) ? 'audio/wav' : mimeFor(t.path) })); blob = true;
+    }
+    pl.url = blob ? url : null; pl.el.src = url; pl.el.playbackRate = audio.playbackRate;
     if (ctx) pl.gain.gain.setValueAtTime(0, ctx.currentTime);
     await new Promise((res, rej) => {
       const ok = () => { pl.el.removeEventListener('error', bad); res(); };
@@ -1246,7 +1264,7 @@ function bindUI() {
     }));
     ['loadedmetadata', 'durationchange', 'seeked'].forEach(ev => el.addEventListener(ev, live(() => updateSeek(true))));
     el.addEventListener('error', live(() => {
-      if (!audio.src) return;
+      if (!audio.src || document.body.classList.contains('loading')) return;
       toast(T('این فایل قابل‌پخش نیست'));
     }));
   });

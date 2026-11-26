@@ -151,6 +151,26 @@ async fn read_audio(path: String) -> Result<Response, String> {
     Ok(Response::new(bytes))
 }
 
+/// Lets the WebView stream a plain audio file straight from disk (asset protocol, range
+/// requests) instead of receiving the whole file in memory. Returns false for formats that
+/// have to be decoded first; the caller then falls back to `read_audio`.
+#[tauri::command]
+async fn prepare_stream(app: AppHandle, path: String) -> Result<bool, String> {
+    let p = PathBuf::from(path);
+    if !is_audio(&p) {
+        return Ok(false);
+    }
+    let p2 = p.clone();
+    let direct = tauri::async_runtime::spawn_blocking(move || !(decode::always_decode(&p2) || decode::is_alac(&p2)))
+        .await
+        .map_err(|e| e.to_string())?;
+    if !direct {
+        return Ok(false);
+    }
+    app.asset_protocol_scope().allow_file(&p).map_err(|e| e.to_string())?;
+    Ok(true)
+}
+
 /// Fallback used when the WebView refuses a file it was expected to play: always decode in Rust / ffmpeg.
 #[tauri::command]
 async fn decode_audio(path: String) -> Result<Response, String> {
@@ -568,6 +588,7 @@ fn main() {
             cached_library,
             watch_folders,
             read_audio,
+            prepare_stream,
             decode_audio,
             read_cover,
             track_info,
