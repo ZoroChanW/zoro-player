@@ -3,7 +3,7 @@
 // WebView's generic "Unknown app" / "Playing from Edge".
 // On other platforms this is a harmless no-op.
 
-pub const AUMID: &str = "ZoroPlayer";
+pub const AUMID: &str = "com.zoro.player";
 
 #[cfg_attr(not(windows), allow(dead_code))]
 #[derive(Debug)]
