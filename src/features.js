@@ -425,6 +425,7 @@ async function openEdit(i) {
     if (!f('file').value.trim()) { showErr(T('نام فایل نباید خالی باشد')); return false; }
     showErr('');
     const btns = $$('button', dlgFoot); btns.forEach(b => { b.disabled = true; });
+    const resume = Z.releaseFile(t.path);                      // never rewrite a file that is being streamed
     try {
       const res = await invoke('edit_track', {
         path: t.path,
@@ -435,8 +436,9 @@ async function openEdit(i) {
         },
       });
       applyEdit(t.path, res, !!coverPath || removeCover);
+      resume();
       return true;
-    } catch (e) { showErr(errText(e)); return false; } finally { btns.forEach(b => { b.disabled = false; }); }
+    } catch (e) { resume(); showErr(errText(e)); return false; } finally { btns.forEach(b => { b.disabled = false; }); }
   };
   await openModal({
     title: T('ویرایش نام و تگ‌ها'), body, wide: true, dismiss: false,

@@ -738,6 +738,17 @@ function updateTrack(oldPath, t) {
   renderList(); renderFolders(); updateStatus();
   document.dispatchEvent(new CustomEvent('zp:lib'));
 }
+/* Drops our hold on a file that is about to be rewritten / renamed (tag editor). Returns a function
+   that resumes playback of the (possibly renamed) track at the same position. */
+function releaseFile(path) {
+  clearPre();                                                  // a preloaded stream of that file would keep it open too
+  const cur = st.lib[st.cur];
+  if (!cur || cur.path !== path || !audio.src) return () => {};
+  const pos = audio.currentTime || 0, playing = !audio.paused, idx = st.cur;
+  finishFade();
+  audio.pause(); audio.removeAttribute('src'); audio.load();
+  return () => { if (st.cur === idx) playIndex(idx, { startAt: pos, autoplay: playing }); };
+}
 function reloadCover() { const t = st.lib[st.cur]; if (t) loadCover(t, st.loadToken); }
 
 /* tmux-style status line */
@@ -1367,7 +1378,7 @@ const nTracks = n => T('{n} آهنگ', { n: fa(n) });
 window.ZP = {
   st, store, toast, esc, fa, fmt, baseName, normPath, inFolder, invoke, listen, $, $$, clamp, appWindow,
   get S() { return S; }, get folders() { return folders; }, get files() { return files; }, get excluded() { return excluded; },
-  getVisible, sortIdx, playFrom, playIndex, queueInsert, togglePlay, removeFromLibrary, restoreExcluded,
+  releaseFile, getVisible, sortIdx, playFrom, playIndex, queueInsert, togglePlay, removeFromLibrary, restoreExcluded,
   get audio() { return audio; }, nTracks, updateTrack, reloadCover, renderList, renderFolders, rescan, openSheet, closeSheets,
 };
 

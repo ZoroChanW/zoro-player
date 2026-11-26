@@ -1,6 +1,6 @@
 [package]
 name = "zoro-player"
-version = "1.2.1"
+version = "1.2.2"
 description = "Zoro Player - a Persian RTL music player with EQ, visualizer and desktop widget"
 edition = "2021"
 
@@ -28,4 +28,4 @@ opt-level = 3
 lto = true
 codegen-units = 1
 strip = true
-panic = "abort"
+panic = "unwind"

@@ -506,6 +506,14 @@ async fn smtc_update(
 }
 
 fn main() {
+    // keep a trace of any panic (the app survives them: panic = "unwind")
+    std::panic::set_hook(Box::new(|info| {
+        use std::io::Write;
+        let path = std::env::temp_dir().join("zoro-player-crash.log");
+        if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(path) {
+            let _ = writeln!(f, "[panic] {info}");
+        }
+    }));
     smtc::set_app_id();
     tauri::Builder::default()
         // must be the first plugin: a second launch just brings the running app forward
